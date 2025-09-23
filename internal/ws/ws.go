@@ -28,6 +28,7 @@ type Repository interface {
 	FetchRooms() ([]*Room, error)
 	JoinRoom(ctx context.Context, client *Client) error
 	WriteMessage(ctx context.Context, msg *Message) error
+	FetchRoomMessages(ctx context.Context, roomID string) ([]*Message, error)
 }
 
 type Service interface {

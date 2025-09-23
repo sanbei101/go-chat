@@ -85,3 +85,32 @@ func (r *repository) WriteMessage(ctx context.Context, msg *Message) error {
 
 	return nil
 }
+
+// FetchMessages retrieves messages for a specific room
+// It is called when a user joins a room to load previous messages
+func (r *repository) FetchRoomMessages(ctx context.Context, roomID string) ([]*Message, error) {
+	query := `
+        SELECT rm.user_id, u.username, rm.message
+        FROM room_message rm
+        JOIN users u ON rm.user_id = u.id
+        WHERE rm.room_id = $1 AND
+    	rm.created_at >= NOW() - INTERVAL '1 hour'
+        ORDER BY rm.created_at ASC
+    `
+	rows, err := r.db.QueryContext(ctx, query, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*Message
+	for rows.Next() {
+		var msg Message
+		if err := rows.Scan(&msg.UserID, &msg.Username, &msg.Content); err != nil {
+			return nil, err
+		}
+		msg.RoomID = roomID
+		messages = append(messages, &msg)
+	}
+	return messages, nil
+}
