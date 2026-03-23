@@ -207,6 +207,7 @@ export const useChatStore = defineStore("chat", () => {
         userId: response.id,
         username: response.username,
       }
+      localStorage.setItem("token", response.accessToken)
 
       await loadRooms(true)
       return true
@@ -253,6 +254,7 @@ export const useChatStore = defineStore("chat", () => {
   function logout() {
     auth.value = null
     authError.value = ""
+    localStorage.removeItem("token")
     resetChatState()
   }
 
