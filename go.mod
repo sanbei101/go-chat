@@ -1,4 +1,4 @@
-module github.com/ihgazi/go-chat
+module github.com/sanbei101/go-chat
 
 go 1.26
 

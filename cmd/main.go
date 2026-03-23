@@ -5,11 +5,11 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/ihgazi/go-chat/config"
-	"github.com/ihgazi/go-chat/db"
-	"github.com/ihgazi/go-chat/internal/user"
-	"github.com/ihgazi/go-chat/internal/ws"
-	"github.com/ihgazi/go-chat/router"
+	"github.com/sanbei101/go-chat/config"
+	"github.com/sanbei101/go-chat/db"
+	"github.com/sanbei101/go-chat/internal/user"
+	"github.com/sanbei101/go-chat/internal/ws"
+	"github.com/sanbei101/go-chat/router"
 )
 
 func main() {

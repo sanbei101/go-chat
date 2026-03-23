@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/ihgazi/go-chat/internal/user"
-	"github.com/ihgazi/go-chat/internal/ws"
-	"github.com/ihgazi/go-chat/util"
+	"github.com/sanbei101/go-chat/internal/user"
+	"github.com/sanbei101/go-chat/internal/ws"
+	"github.com/sanbei101/go-chat/util"
 )
 
 // GIN Router to create API endpoints
@@ -43,8 +43,8 @@ func Init(userHandler *user.Handler, wsHandler *ws.Handler) *gin.Engine {
 		protected.GET("/getClients/:roomId", wsHandler.GetClients)
 	}
 
-    // Moved joinRoom out of protected group
-    // for WebSocket issues in deployment
+	// Moved joinRoom out of protected group
+	// for WebSocket issues in deployment
 	r.GET("/joinRoom/:roomId", wsHandler.JoinRoom)
 
 	return r

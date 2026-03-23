@@ -2,9 +2,10 @@ package db
 
 import (
 	"database/sql"
+
 	_ "github.com/lib/pq"
 
-	"github.com/ihgazi/go-chat/config"
+	"github.com/sanbei101/go-chat/config"
 )
 
 type Database struct {

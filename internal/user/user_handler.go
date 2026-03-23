@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ihgazi/go-chat/config"
+	"github.com/sanbei101/go-chat/config"
 )
 
 // Handler object is used to create the user
