@@ -70,7 +70,7 @@ func (h *Handler) JoinRoom(c *gin.Context) {
 
 	err = h.Service.JoinRoom(c.Request.Context(), cl, m)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Error joining room: %s", err.Error())
 		conn.Close()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join room!"})
 	}
