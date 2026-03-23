@@ -36,7 +36,6 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// TODO: whitelist the frontend origin
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},

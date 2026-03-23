@@ -33,7 +33,6 @@ func Init(userHandler *user.Handler, wsHandler *ws.Handler) *gin.Engine {
 	protected := r.Group("/ws")
 	protected.Use(util.JWTValidateToken())
 	{
-		protected.GET("/auth", userHandler.AuthUser)
 		protected.POST("/createRoom", wsHandler.CreateRoom)
 		protected.GET("/getRooms", wsHandler.GetRooms)
 		protected.GET("/getClients/:roomId", wsHandler.GetClients)

@@ -20,16 +20,19 @@ type Config struct {
 var config *Config
 
 func LoadConfig() Config {
-	// returning config if already loaded
 	if config != nil {
 		return *config
 	}
 
-	// loading config if not already loaded
 	config = &Config{}
 
 	err := godotenv.Load(".env")
-	if err != nil {
+	switch err {
+	case nil:
+		log.Println("Config loaded successfully from .env file")
+	case os.ErrNotExist:
+		log.Println("No .env file found, using environment variables")
+	default:
 		log.Fatalf("Error loading .env file: %s", err)
 	}
 
@@ -40,15 +43,4 @@ func LoadConfig() Config {
 	config.ClientDomain = os.Getenv("CLIENT_DOMAIN")
 
 	return *config
-}
-
-// Load .env configs
-func LoadEnv() string {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %s", err)
-	}
-
-	secret_key := os.Getenv("SECRET_KEY")
-	return secret_key
 }

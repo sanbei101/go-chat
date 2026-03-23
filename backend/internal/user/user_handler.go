@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sanbei101/go-chat/config"
 )
 
 // Handler object is used to create the user
@@ -26,14 +25,11 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Calling Service method
 	res, err := h.Service.CreateUser(c.Request.Context(), &u)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, res)
 }
 
@@ -43,36 +39,14 @@ func (h *Handler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Calling service method
 	u, err := h.Service.Login(c.Request.Context(), &user)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Credentials!"})
 		return
 	}
-
-	// Set cookie in context with JWT token
-	domain := config.LoadConfig().ClientDomain
-	secure := true
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("jwt", u.AccessToken, 3600, "/", domain, secure, true)
 	c.JSON(http.StatusOK, u)
 }
 
 func (h *Handler) Logout(c *gin.Context) {
-	// Reset cookie
-	domain := config.LoadConfig().ClientDomain
-	secure := true
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("jwt", "", -1, "", domain, secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
-}
-
-// Authentication endpoint to check validity of jwt token
-// Can be reused for refresh token in future
-func (h *Handler) AuthUser(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	username, _ := c.Get("username")
-
-	c.JSON(http.StatusOK, gin.H{"id": userID, "username": username})
 }
