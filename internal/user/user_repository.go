@@ -1,58 +1,59 @@
 package user
 
 import (
-    "errors"
-    "context"
-    "database/sql"
+	"context"
+	"errors"
+
+	"github.com/sanbei101/go-chat/internal/store"
 )
 
 // User repository injected with database connection object
 // Takes a User struct and updates the database
 
-type DBTX interface {
-    ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-    PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-    QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-    QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-}
-
 type repository struct {
-    db DBTX
+	queries *store.Queries
 }
 
-func NewRepository(db DBTX) Repository {
-    return &repository{db: db}   
+func NewRepository(queries *store.Queries) Repository {
+	return &repository{queries: queries}
 }
 
 func (r *repository) CreateUser(ctx context.Context, user *User) (*User, error) {
-    // Check if user is already registered
-    query := `SELECT id FROM users WHERE email = $1`
-    rows, err := r.db.QueryContext(ctx, query, user.Email)
-    if rows.Next() {
-        return &User{}, errors.New("User already exists!")
-    }
+	exists, err := r.queries.UserExistsByEmail(ctx, user.Email)
+	if err != nil {
+		return &User{}, err
+	}
+	if exists {
+		return &User{}, errors.New("User already exists!")
+	}
 
-    var lastInsertID int
-    query = `INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id`
-    err = r.db.QueryRowContext(ctx, query, user.Username, user.Email, user.Password).Scan(&lastInsertID)
-    
-    if err != nil {
-        return &User{}, err
-    }
+	createdUser, err := r.queries.CreateUser(ctx, store.CreateUserParams{
+		Username: user.Username,
+		Email:    user.Email,
+		Password: user.Password,
+	})
+	if err != nil {
+		return &User{}, err
+	}
 
-    user.ID = int64(lastInsertID)
-    return user, nil
+	return &User{
+		ID:       createdUser.ID,
+		Username: createdUser.Username,
+		Email:    createdUser.Email,
+		Password: createdUser.Password,
+	}, nil
 }
 
 func (r *repository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-    u := User{}
-    query := `SELECT id, username, email, password FROM users WHERE email = $1`
-    err := r.db.QueryRowContext(ctx, query, email).Scan(&u.ID, &u.Username, &u.Email, &u.Password)
-    
-    if err != nil {
-        return &User{}, err
-    }
+	u, err := r.queries.GetUserByEmail(ctx, email)
+	if err != nil {
+		return &User{}, err
+	}
 
-    return &u, nil
+	return &User{
+		ID:       u.ID,
+		Username: u.Username,
+		Email:    u.Email,
+		Password: u.Password,
+	}, nil
 }
-

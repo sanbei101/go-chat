@@ -2,54 +2,43 @@ package ws
 
 import (
 	"context"
-	"database/sql"
 	"strconv"
+
+	"github.com/sanbei101/go-chat/internal/store"
 )
 
-type DBTX interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-}
-
 type repository struct {
-	db DBTX
+	queries *store.Queries
 }
 
-func NewRepository(db DBTX) Repository {
-	return &repository{db: db}
+func NewRepository(queries *store.Queries) Repository {
+	return &repository{queries: queries}
 }
 
 func (r *repository) CreateRoom(ctx context.Context, room *Room) (*Room, error) {
-	var lastInsertID int
-	query := `INSERT INTO room (name) VALUES ($1) RETURNING id`
-	err := r.db.QueryRowContext(ctx, query, room.Name).Scan(&lastInsertID)
-
+	createdRoom, err := r.queries.CreateRoom(ctx, room.Name)
 	if err != nil {
 		return &Room{}, err
 	}
 
-	room.ID = strconv.Itoa(lastInsertID)
-	return room, nil
+	return &Room{
+		ID:   strconv.FormatInt(createdRoom.ID, 10),
+		Name: createdRoom.Name,
+	}, nil
 }
 
 func (r *repository) FetchRooms() ([]*Room, error) {
-	query := `SELECT id, name FROM room`
-	rows, err := r.db.Query(query)
+	rows, err := r.queries.ListRooms(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var rooms []*Room
-	for rows.Next() {
-		var room Room
-		if err := rows.Scan(&room.ID, &room.Name); err != nil {
-			return nil, err
-		}
-		rooms = append(rooms, &room)
+	for _, row := range rows {
+		rooms = append(rooms, &Room{
+			ID:   strconv.FormatInt(row.ID, 10),
+			Name: row.Name,
+		})
 	}
 
 	return rooms, nil
@@ -58,60 +47,77 @@ func (r *repository) FetchRooms() ([]*Room, error) {
 // JoinRoom adds a new entry to room_member table
 // if user already exists update last_online time
 func (r *repository) JoinRoom(ctx context.Context, client *Client) error {
-	query := `SELECT FROM room_member WHERE room_id = $1 AND user_id = $2`
-	err := r.db.QueryRowContext(ctx, query, client.RoomID, client.ID).Scan()
-
-	switch err {
-	case sql.ErrNoRows:
-		query = `INSERT INTO room_member (room_id, user_id) VALUES ($1, $2)`
-		_, err = r.db.ExecContext(ctx, query, client.RoomID, client.ID)
-	case nil:
-		query = `UPDATE room_member SET last_online = NOW() WHERE room_id = $1 and user_id = $2`
-		_, err = r.db.ExecContext(ctx, query, client.RoomID, client.ID)
-	default:
+	roomID, err := strconv.ParseInt(client.RoomID, 10, 64)
+	if err != nil {
+		return err
+	}
+	userID, err := strconv.ParseInt(client.ID, 10, 64)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	params := store.RoomMemberExistsParams{
+		RoomID: roomID,
+		UserID: userID,
+	}
+	exists, err := r.queries.RoomMemberExists(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return r.queries.TouchRoomMember(ctx, store.TouchRoomMemberParams{
+			RoomID: roomID,
+			UserID: userID,
+		})
+	}
+
+	return r.queries.CreateRoomMember(ctx, store.CreateRoomMemberParams{
+		RoomID: roomID,
+		UserID: userID,
+	})
 }
 
 // WriteMessage adds a new message to the room_message table
 // It is called asynchronously with websocket messages
 func (r *repository) WriteMessage(ctx context.Context, msg *Message) error {
-	query := `INSERT INTO room_message (room_id, user_id, message) VALUES ($1, $2, $3)`
-	_, err := r.db.ExecContext(ctx, query, msg.RoomID, msg.UserID, msg.Content)
+	roomID, err := strconv.ParseInt(msg.RoomID, 10, 64)
+	if err != nil {
+		return err
+	}
+	userID, err := strconv.ParseInt(msg.UserID, 10, 64)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return r.queries.CreateRoomMessage(ctx, store.CreateRoomMessageParams{
+		RoomID:  roomID,
+		UserID:  userID,
+		Message: msg.Content,
+	})
 }
 
 // FetchMessages retrieves messages for a specific room
 // It is called when a user joins a room to load previous messages
 func (r *repository) FetchRoomMessages(ctx context.Context, roomID string) ([]*Message, error) {
-	query := `
-        SELECT rm.user_id, u.username, rm.message
-        FROM room_message rm
-        JOIN users u ON rm.user_id = u.id
-        WHERE rm.room_id = $1 AND
-    	rm.created_at >= NOW() - INTERVAL '1 hour'
-        ORDER BY rm.created_at ASC
-    `
-	rows, err := r.db.QueryContext(ctx, query, roomID)
+	parsedRoomID, err := strconv.ParseInt(roomID, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	rows, err := r.queries.ListRecentRoomMessages(ctx, parsedRoomID)
+	if err != nil {
+		return nil, err
+	}
 
 	var messages []*Message
-	for rows.Next() {
-		var msg Message
-		if err := rows.Scan(&msg.UserID, &msg.Username, &msg.Content); err != nil {
-			return nil, err
-		}
-		msg.RoomID = roomID
-		messages = append(messages, &msg)
+	for _, row := range rows {
+		messages = append(messages, &Message{
+			RoomID:   strconv.FormatInt(row.RoomID, 10),
+			UserID:   strconv.FormatInt(row.UserID, 10),
+			Username: row.Username,
+			Content:  row.Message,
+		})
 	}
 	return messages, nil
 }

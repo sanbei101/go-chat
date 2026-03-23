@@ -1,22 +1,26 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 
-	_ "github.com/lib/pq"
-
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sanbei101/go-chat/config"
 )
 
 type Database struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 func NewDatabase() (*Database, error) {
-	PostgresUrl := config.LoadConfig().PostgresUrl
+	postgresURL := config.LoadConfig().PostgresUrl
 
-	db, err := sql.Open("postgres", PostgresUrl)
+	db, err := pgxpool.New(context.Background(), postgresURL)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := db.Ping(context.Background()); err != nil {
+		db.Close()
 		return nil, err
 	}
 
@@ -27,6 +31,6 @@ func (d *Database) Close() {
 	d.db.Close()
 }
 
-func (d *Database) GetDB() *sql.DB {
+func (d *Database) GetDB() *pgxpool.Pool {
 	return d.db
 }
