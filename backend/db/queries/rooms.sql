@@ -57,3 +57,7 @@ JOIN users u ON rm.user_id = u.id
 WHERE rm.room_id = @room_id
   AND rm.created_at >= NOW() - INTERVAL '1 hour'
 ORDER BY rm.created_at ASC;
+
+
+-- name: BroadcastMessage :exec
+SELECT pg_notify(@channel::text, @payload::text);

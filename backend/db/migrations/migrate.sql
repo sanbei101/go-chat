@@ -1,7 +1,3 @@
-CREATE DATABASE "chat";
-
-\c "chat"
-
 DROP TABLE IF EXISTS "room_message";
 DROP TABLE IF EXISTS "room_member";
 DROP TABLE IF EXISTS "room";

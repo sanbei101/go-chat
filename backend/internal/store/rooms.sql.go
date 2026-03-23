@@ -11,6 +11,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const broadcastMessage = `-- name: BroadcastMessage :exec
+SELECT pg_notify($1::text, $2::text)
+`
+
+type BroadcastMessageParams struct {
+	Channel string `json:"channel"`
+	Payload string `json:"payload"`
+}
+
+func (q *Queries) BroadcastMessage(ctx context.Context, arg BroadcastMessageParams) error {
+	_, err := q.db.Exec(ctx, broadcastMessage, arg.Channel, arg.Payload)
+	return err
+}
+
 const createRoom = `-- name: CreateRoom :one
 INSERT INTO room (
     name
