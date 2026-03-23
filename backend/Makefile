@@ -16,4 +16,7 @@ migrateup:
 migratedown:
 	migrate -path db/migrations -database "postgresql://postgres:123@localhost:5432/go-chat?sslmode=disable" -verbose down
 
-.PHONY: postgresinit postgres createdb dropdb migrateup migratedown
+bench:
+	go test -run '^$$' -bench BenchmarkHubBroadcast -benchmem ./internal/ws
+
+.PHONY: postgresinit postgres createdb dropdb migrateup migratedown bench

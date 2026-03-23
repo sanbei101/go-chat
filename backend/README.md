@@ -67,5 +67,17 @@ The server will start and listen on the port specified in your `.env` file.
 
 You can use tools like [Postman](https://www.postman.com/) or [curl](https://curl.se/) to interact with the REST endpoints and WebSocket clients for real-time messaging.
 
----
+### 7. Benchmarking Message Broadcast
 
+The backend includes a Go benchmark for the message broadcast path in `internal/ws`. It connects to a real PostgreSQL database through `POSTGRES_URL`, prepares the required tables if needed, truncates benchmark data, and writes real `room_message` rows during the run.
+
+Run it locally with:
+
+```bash
+export POSTGRES_URL="postgresql://postgres:123@localhost:5432/chat?sslmode=disable"
+make bench
+```
+
+This benchmark exercises the room broadcast loop with 1, 10, 100, and 500 connected clients and reports `ns/op`, `B/op`, and `allocs/op`.
+
+---

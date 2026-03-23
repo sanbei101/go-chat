@@ -30,49 +30,61 @@ func NewHub(repository Repository) *Hub {
 	}
 }
 
+func (h *Hub) registerClient(cl *Client) {
+	if _, ok := h.Rooms[cl.RoomID]; ok {
+		r := h.Rooms[cl.RoomID]
+
+		if _, ok := r.Clients[cl.ID]; !ok {
+			r.Clients[cl.ID] = cl
+		}
+	}
+}
+
+func (h *Hub) unregisterClient(cl *Client) {
+	if _, ok := h.Rooms[cl.RoomID]; ok {
+		r := h.Rooms[cl.RoomID]
+
+		if _, ok := r.Clients[cl.ID]; ok {
+			// Broadcast exit message
+			h.Broadcast <- &Message{
+				Content:  "user has left the chat",
+				RoomID:   cl.RoomID,
+				Username: cl.Username,
+				UserID:   cl.ID,
+			}
+
+			delete(r.Clients, cl.ID)
+			close(cl.Message)
+		}
+	}
+}
+
+func (h *Hub) broadcastMessage(msg *Message) {
+	if _, ok := h.Rooms[msg.RoomID]; ok {
+		for _, cl := range h.Rooms[msg.RoomID].Clients {
+			cl.Message <- msg
+		}
+
+		// Asynchronously write message to database
+		go func(msg *Message) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h.Repo.WriteMessage(ctx, msg); err != nil {
+				log.Printf("Error writing message to database: %v", err)
+			}
+		}(msg)
+	}
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
 		case cl := <-h.Register:
-			if _, ok := h.Rooms[cl.RoomID]; ok {
-				r := h.Rooms[cl.RoomID]
-
-				if _, ok := r.Clients[cl.ID]; !ok {
-					r.Clients[cl.ID] = cl
-				}
-			}
+			h.registerClient(cl)
 		case cl := <-h.Unregister:
-			if _, ok := h.Rooms[cl.RoomID]; ok {
-				r := h.Rooms[cl.RoomID]
-
-				if _, ok := r.Clients[cl.ID]; ok {
-					// Broadcast exit message
-					h.Broadcast <- &Message{
-						Content:  "user has left the chat",
-						RoomID:   cl.RoomID,
-						Username: cl.Username,
-						UserID:   cl.ID,
-					}
-
-					delete(r.Clients, cl.ID)
-					close(cl.Message)
-				}
-			}
+			h.unregisterClient(cl)
 		case msg := <-h.Broadcast:
-			if _, ok := h.Rooms[msg.RoomID]; ok {
-				for _, cl := range h.Rooms[msg.RoomID].Clients {
-					cl.Message <- msg
-				}
-
-				// Asynchronously write message to database
-				go func(msg *Message) {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer cancel()
-					if err := h.Repo.WriteMessage(ctx, msg); err != nil {
-						log.Printf("Error writing message to database: %v", err)
-					}
-				}(msg)
-			}
+			h.broadcastMessage(msg)
 		}
 	}
 }
