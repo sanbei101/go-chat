@@ -14,24 +14,10 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_DB: chat
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d chat"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+
     defaults:
       run:
         working-directory: backend
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -41,7 +27,9 @@ jobs:
         with:
           go-version: stable
 
-      - name: Run benchmark
-        env:
-          POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/chat?sslmode=disable
-        run: go test -run '^$' -bench BenchmarkHubBroadcast -benchmem -benchtime=10s ./internal/ws
+      - name: Set up PostgreSQL
+        uses: ikalnytskyi/action-setup-postgres@v8
+        id: postgres
+
+      - name: Run database migrations
+        run: psql ${{ steps.postgres.outputs.connection-uri }} -f db/migrations/migrate.sql
