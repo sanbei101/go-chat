@@ -1,17 +1,30 @@
 <script setup lang="ts">
+import { reactive, ref } from "vue"
+import { storeToRefs } from "pinia"
 import { MessageSquare } from "lucide-vue-next"
 import { useRouter } from "vue-router"
 import Button from "@/components/ui/button/Button.vue"
 import Badge from "@/components/ui/badge/Badge.vue"
 import Card from "@/components/ui/card/Card.vue"
 import Input from "@/components/ui/input/Input.vue"
-import { useAuthPage } from "@/composables/use-chat"
+import { useChatStore } from "@/stores/chat"
 
 const router = useRouter()
-const { authMode, authLoading, authError, authForm, submitAuth } = useAuthPage()
+const chatStore = useChatStore()
+const { authError } = storeToRefs(chatStore)
+
+const authMode = ref<"login" | "signup">("login")
+const authLoading = ref(false)
+const authForm = reactive({
+  username: "",
+  email: "",
+  password: "",
+})
 
 async function handleSubmit() {
-  const ok = await submitAuth()
+  authLoading.value = true
+  const ok = await chatStore.authenticate(authMode.value, authForm)
+  authLoading.value = false
   if (ok) {
     router.push({ name: "chat" })
   }
@@ -19,7 +32,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <main class="min-h-screenbg-gradient-to-b from-white to-gray-50 px-4 py-6 text-foreground md:px-6">
+  <main class="min-h-screen bg-linear-to-b from-white to-stone-50 px-4 py-6 text-foreground md:px-6">
     <div class="mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl flex-col gap-4">
       <section class="flex items-center rounded-2xl border bg-background/80 px-4 py-3 shadow-sm backdrop-blur md:px-5">
         <div class="flex items-center gap-3">

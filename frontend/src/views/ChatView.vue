@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { nextTick, onMounted, onUnmounted, ref, watch } from "vue"
+import { storeToRefs } from "pinia"
 import { useRouter } from "vue-router"
 import { LogOut, MessageSquare, Plus, Send, Users } from "lucide-vue-next"
 import Button from "@/components/ui/button/Button.vue"
@@ -8,10 +9,13 @@ import Card from "@/components/ui/card/Card.vue"
 import Input from "@/components/ui/input/Input.vue"
 import Separator from "@/components/ui/separator/Separator.vue"
 import Textarea from "@/components/ui/textarea/Textarea.vue"
-import { useChatPage } from "@/composables/use-chat"
+import { useChatStore } from "@/stores/chat"
 
 const router = useRouter()
+const chatStore = useChatStore()
 const messageListRef = ref<HTMLElement | null>(null)
+const createRoomName = ref("")
+const draft = ref("")
 
 const {
   auth,
@@ -20,32 +24,54 @@ const {
   sending,
   roomError,
   messageError,
-  createRoomName,
-  draft,
   rooms,
   members,
   messages,
   activeRoomId,
   activeRoom,
-  bootstrapSession,
-  createRoom,
-  sendMessage,
-  logout,
-} = useChatPage(messageListRef)
+} = storeToRefs(chatStore)
 
 async function init() {
-  const ok = await bootstrapSession()
+  const ok = await chatStore.ensureReady()
   if (!ok) {
     router.replace({ name: "auth" })
   }
 }
 
+async function handleCreateRoom() {
+  await chatStore.createRoom(createRoomName.value)
+  createRoomName.value = ""
+}
+
+function handleSendMessage() {
+  const sent = chatStore.sendMessage(draft.value)
+  if (sent) {
+    draft.value = ""
+  }
+}
+
 function handleLogout() {
-  logout()
+  chatStore.logout()
   router.replace({ name: "auth" })
 }
 
+watch(
+  messages,
+  async () => {
+    await nextTick()
+    const element = messageListRef.value
+    if (element) {
+      element.scrollTop = element.scrollHeight
+    }
+  },
+  { deep: true },
+)
+
 onMounted(init)
+
+onUnmounted(() => {
+  chatStore.disconnectRoom()
+})
 </script>
 
 <template>
@@ -71,7 +97,7 @@ onMounted(init)
       </section>
 
       <section class="grid flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <Card class="flex min-h-180 flex-col overflow-hidden bg-background/88 backdrop-blur">
+        <Card class="flex min-h-[720px] flex-col overflow-hidden bg-background/88 backdrop-blur">
           <div class="space-y-4 p-4">
             <div>
               <p class="text-sm font-medium">房间</p>
@@ -79,8 +105,8 @@ onMounted(init)
             </div>
 
             <div class="flex gap-2">
-              <Input v-model="createRoomName" placeholder="new-room" @keyup.enter="createRoom" />
-              <Button size="icon" :disabled="roomLoading" @click="createRoom">
+              <Input v-model="createRoomName" placeholder="new-room" @keyup.enter="handleCreateRoom" />
+              <Button size="icon" :disabled="roomLoading" @click="handleCreateRoom">
                 <Plus class="size-4" />
               </Button>
             </div>
@@ -97,7 +123,7 @@ onMounted(init)
               type="button"
               class="w-full rounded-xl border px-3 py-3 text-left transition"
               :class="room.id === activeRoomId ? 'border-primary bg-primary/5' : 'bg-background hover:bg-secondary/70'"
-              @click="activeRoomId = room.id"
+              @click="chatStore.activeRoomId = room.id"
             >
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
@@ -114,7 +140,7 @@ onMounted(init)
           </div>
         </Card>
 
-        <Card class="flex min-h-180 flex-col overflow-hidden bg-background/88 backdrop-blur">
+        <Card class="flex min-h-[720px] flex-col overflow-hidden bg-background/88 backdrop-blur">
           <div class="flex items-center justify-between gap-3 p-4">
             <div>
               <h2 class="text-lg font-semibold">{{ activeRoom?.name || "选择一个房间" }}</h2>
@@ -145,12 +171,12 @@ onMounted(init)
                       :class="message.user_id === auth?.userId ? 'bg-primary text-primary-foreground' : 'border bg-secondary/40'"
                     >
                       <p class="mb-1 text-xs opacity-70">{{ message.username }}</p>
-                      <p class="whitespace-pre-wrap wrap-break-word text-sm">{{ message.content }}</p>
+                      <p class="whitespace-pre-wrap break-words text-sm">{{ message.content }}</p>
                     </div>
                   </div>
                 </template>
 
-                <div v-else class="flex h-full min-h-70 items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
+                <div v-else class="flex h-full min-h-[280px] items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
                   {{ activeRoom ? "发送第一条消息" : "先选择或创建房间" }}
                 </div>
               </div>
@@ -158,7 +184,7 @@ onMounted(init)
               <Separator />
 
               <div class="p-4">
-                <form class="space-y-3" @submit.prevent="sendMessage">
+                <form class="space-y-3" @submit.prevent="handleSendMessage">
                   <Textarea
                     v-model="draft"
                     :disabled="!activeRoomId"

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
 import AuthView from "@/views/AuthView.vue"
 import ChatView from "@/views/ChatView.vue"
-import { hasStoredAuth } from "@/composables/use-chat"
+import { pinia } from "@/lib/pinia"
+import { useChatStore } from "@/stores/chat"
 
 const router = createRouter({
   history: createWebHistory(),
@@ -22,7 +23,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const authed = hasStoredAuth()
+  const authed = useChatStore(pinia).isLoggedIn
 
   if (to.meta.requiresAuth && !authed) {
     return { name: "auth" }
