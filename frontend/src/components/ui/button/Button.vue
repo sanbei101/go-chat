@@ -1,55 +1,31 @@
 <script setup lang="ts">
-import type { ButtonHTMLAttributes } from "vue"
-import { cva, type VariantProps } from "class-variance-authority"
+import type { PrimitiveProps } from "reka-ui"
+import type { HTMLAttributes } from "vue"
+import type { ButtonVariants } from "."
+import { Primitive } from "reka-ui"
 import { cn } from "@/lib/utils"
+import { buttonVariants } from "."
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        outline: "border bg-background hover:bg-accent hover:text-accent-foreground",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
-        icon: "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-)
+interface Props extends PrimitiveProps {
+  variant?: ButtonVariants["variant"]
+  size?: ButtonVariants["size"]
+  class?: HTMLAttributes["class"]
+}
 
-type ButtonVariants = VariantProps<typeof buttonVariants>
-
-const props = withDefaults(
-  defineProps<{
-    class?: ButtonHTMLAttributes["class"]
-    type?: ButtonHTMLAttributes["type"]
-    variant?: ButtonVariants["variant"]
-    size?: ButtonVariants["size"]
-    disabled?: boolean
-  }>(),
-  {
-    type: "button",
-    variant: "default",
-    size: "default",
-  },
-)
+const props = withDefaults(defineProps<Props>(), {
+  as: "button",
+})
 </script>
 
 <template>
-  <button
-    :type="type"
-    :disabled="disabled"
+  <Primitive
+    data-slot="button"
+    :data-variant="variant"
+    :data-size="size"
+    :as="as"
+    :as-child="asChild"
     :class="cn(buttonVariants({ variant, size }), props.class)"
   >
     <slot />
-  </button>
+  </Primitive>
 </template>
