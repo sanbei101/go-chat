@@ -2,6 +2,7 @@ package util
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,12 +22,23 @@ func deauthorize(c *gin.Context) {
 	c.Abort()
 }
 
+func extractToken(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		const bearerPrefix = "Bearer "
+		if after, ok := strings.CutPrefix(authHeader, bearerPrefix); ok {
+			return strings.TrimSpace(after), nil
+		}
+	}
+
+	return c.Cookie("jwt")
+}
+
 // Auth middle to check validity of JWT token
 func JWTValidateToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		secretKey := config.LoadConfig().SecretKey
-		// Extract the token from the cookie
-		tokenString, err := c.Cookie("jwt")
+		tokenString, err := extractToken(c)
 		if err != nil {
 			deauthorize(c)
 			return

@@ -55,7 +55,7 @@ func (h *Handler) Login(c *gin.Context) {
 	domain := config.LoadConfig().ClientDomain
 	secure := true
 	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("jwt", u.accessToken, 3600, "/", domain, secure, true)
+	c.SetCookie("jwt", u.AccessToken, 3600, "/", domain, secure, true)
 	c.JSON(http.StatusOK, u)
 }
 

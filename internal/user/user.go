@@ -34,7 +34,7 @@ type LoginUserReq struct {
 
 // Login Response
 type LoginUserRes struct {
-	accessToken string
+	AccessToken string `json:"accessToken"`
 	Username    string `json:"username" db:"username"`
 	ID          string `json:"id" db:"id"`
 }
