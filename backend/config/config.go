@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 
 	"log"
@@ -27,13 +28,14 @@ func LoadConfig() Config {
 	config = &Config{}
 
 	err := godotenv.Load(".env")
-	switch err {
-	case nil:
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Println("No .env file found, using environment variables")
+		} else {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	} else {
 		log.Println("Config loaded successfully from .env file")
-	case os.ErrNotExist:
-		log.Println("No .env file found, using environment variables")
-	default:
-		log.Fatalf("Error loading .env file: %s", err)
 	}
 
 	config.ServerHost = os.Getenv("SERVER_HOST")
