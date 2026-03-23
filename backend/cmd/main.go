@@ -22,9 +22,6 @@ func main() {
 
 	queries := store.New(dbConn.GetDB())
 
-	// Repository is injected with dbConn, takes User struct and updates database
-	// Service injected with Repository, takes CreateUserReq and creates User Struct
-	// Handler injected with Service, parses the Json data and creates the CreateUserReq
 	userRep := user.NewRepository(queries)
 	userSvc := user.NewService(userRep)
 	userHndlr := user.NewHandler(userSvc)
@@ -35,10 +32,8 @@ func main() {
 	wsHndlr := ws.NewHandler(wsSvc)
 	go hub.Run()
 
-	// Pulling in server config
 	conf := config.LoadConfig()
 
-	// Initializing GIN router and running the server
 	r := router.Init(userHndlr, wsHndlr)
 	port, _ := strconv.Atoi(conf.ServerPort)
 	addr := fmt.Sprintf("%s:%d", conf.ServerHost, port)

@@ -75,8 +75,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-[radial-gradient(circle_at_top,rgba(0,0,0,0.04),transparent_35%),linear-gradient(180deg,#fafaf9_0%,#f4f4f0_100%)] px-4 py-6 text-foreground md:px-6">
-    <div class="mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl flex-col gap-4">
+  <main class="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(0,0,0,0.04),transparent_35%),linear-gradient(180deg,#fafaf9_0%,#f4f4f0_100%)] px-4 py-6 text-foreground md:px-6">
+    <div class="mx-auto flex h-[calc(100vh-3rem)] max-w-7xl flex-col gap-4">
       <section class="flex items-center justify-between rounded-2xl border bg-background/80 px-4 py-3 shadow-sm backdrop-blur md:px-5">
         <div class="flex items-center gap-3">
           <div class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
@@ -96,8 +96,8 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section class="grid flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <Card class="flex min-h-180 flex-col overflow-hidden bg-background/88 backdrop-blur">
+      <section class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <Card class="flex min-h-0 flex-col overflow-hidden bg-background/88 backdrop-blur">
           <div class="space-y-4 p-4">
             <div>
               <p class="text-sm font-medium">房间</p>
@@ -140,7 +140,7 @@ onUnmounted(() => {
           </div>
         </Card>
 
-        <Card class="flex min-h-180 flex-col overflow-hidden bg-background/88 backdrop-blur">
+        <Card class="flex min-h-0 flex-col overflow-hidden bg-background/88 backdrop-blur">
           <div class="flex items-center justify-between gap-3 p-4">
             <div>
               <h2 class="text-lg font-semibold">{{ activeRoom?.name || "选择一个房间" }}</h2>
@@ -156,7 +156,7 @@ onUnmounted(() => {
 
           <Separator />
 
-          <div class="grid flex-1 min-h-0 gap-0 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div class="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_220px]">
             <div class="flex min-h-0 flex-col">
               <div ref="messageListRef" class="flex-1 space-y-3 overflow-y-auto p-4">
                 <template v-if="messages.length">
@@ -205,7 +205,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="border-t p-4 lg:border-t-0 lg:border-l">
+            <div class="min-h-0 overflow-y-auto border-t p-4 lg:border-t-0 lg:border-l">
               <div class="mb-4 flex items-center justify-between">
                 <p class="font-medium">在线成员</p>
                 <Badge variant="secondary">{{ members.length }}</Badge>
