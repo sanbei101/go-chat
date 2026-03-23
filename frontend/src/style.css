@@ -114,7 +114,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    @apply antialiased;
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: "IBM Plex Sans", "PingFang SC", "Noto Sans SC", sans-serif;
+  }
+  #app {
+    min-height: 100vh;
   }
 }
