@@ -137,31 +137,31 @@ onUnmounted(() => {
           <Separator />
 
           <div class="flex-1 space-y-2 overflow-y-auto p-3">
-            <button
+            <Button
               v-for="room in rooms"
               :key="room.id"
-              type="button"
-              class="w-full rounded-xl border px-3 py-3 text-left transition"
+              variant="ghost"
+              class="h-auto w-full justify-start rounded-xl border px-3 py-3 text-left transition"
               :class="
                 room.id === activeRoomId
-                  ? 'border-primary bg-primary/5'
+                  ? 'border-primary bg-primary/5 hover:bg-primary/5'
                   : 'bg-background hover:bg-secondary/70'
               "
               @click="chatStore.activeRoomId = room.id"
             >
-              <div class="flex items-center justify-between gap-3">
+              <div class="flex w-full items-center justify-between gap-3">
                 <div class="min-w-0">
                   <p class="truncate font-medium">{{ room.name }}</p>
                   <p class="text-xs text-muted-foreground">
                     room #{{ room.id }}
                   </p>
                 </div>
-                <Badge variant="outline"
-                  >在线
-                  {{ room.id === activeRoomId ? members.length : "-" }}</Badge
-                >
+
+                <Badge variant="outline">
+                  在线 {{ room.id === activeRoomId ? members.length : "-" }}
+                </Badge>
               </div>
-            </button>
+            </Button>
 
             <div
               v-if="!rooms.length && !roomsLoading"

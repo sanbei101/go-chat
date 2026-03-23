@@ -69,9 +69,11 @@ async function handleSubmit() {
           </div>
 
           <div class="mb-4 flex rounded-lg bg-secondary p-1">
-            <button
+            <Button
               type="button"
-              class="flex-1 rounded-md px-3 py-2 text-sm transition"
+              size="sm"
+              :variant="authMode === 'login' ? 'secondary' : 'ghost'"
+              class="flex-1 rounded-md px-3 py-2"
               :class="
                 authMode === 'login'
                   ? 'bg-background shadow-sm'
@@ -80,10 +82,13 @@ async function handleSubmit() {
               @click="authMode = 'login'"
             >
               登录
-            </button>
-            <button
+            </Button>
+
+            <Button
               type="button"
-              class="flex-1 rounded-md px-3 py-2 text-sm transition"
+              size="sm"
+              :variant="authMode === 'signup' ? 'secondary' : 'ghost'"
+              class="flex-1 rounded-md px-3 py-2"
               :class="
                 authMode === 'signup'
                   ? 'bg-background shadow-sm'
@@ -92,7 +97,7 @@ async function handleSubmit() {
               @click="authMode = 'signup'"
             >
               注册
-            </button>
+            </Button>
           </div>
 
           <form class="space-y-3" @submit.prevent="handleSubmit">

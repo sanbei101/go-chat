@@ -1,6 +1,6 @@
 import { createAlova } from "alova";
 import adapterFetch from "alova/fetch";
-const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8800";
+const baseURL = import.meta.env.VITE_API_BASE_URL as string || "http://localhost:8800";
 
 function readToken() {
   const token = localStorage.getItem("token");
