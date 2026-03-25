@@ -15,6 +15,9 @@ type Config struct {
 	SecretKey    string
 	PostgresUrl  string
 	ClientDomain string
+	RedisAddr    string
+	RedisPass    string
+	RedisDB      string
 }
 
 // Using a singleton pattern to load the config only once and reduce read calls
@@ -43,6 +46,9 @@ func LoadConfig() Config {
 	config.SecretKey = os.Getenv("SECRET_KEY")
 	config.PostgresUrl = os.Getenv("POSTGRES_URL")
 	config.ClientDomain = os.Getenv("CLIENT_DOMAIN")
+	config.RedisAddr = os.Getenv("REDIS_ADDR")
+	config.RedisPass = os.Getenv("REDIS_PASSWORD")
+	config.RedisDB = os.Getenv("REDIS_DB")
 
 	return *config
 }

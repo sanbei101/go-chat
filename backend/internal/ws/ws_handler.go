@@ -54,7 +54,7 @@ func (h *Handler) JoinRoom(c *gin.Context) {
 
 	cl := &Client{
 		Conn:     conn,
-		Message:  make(chan *Message),
+		Message:  make(chan *Message, 32),
 		ID:       clientIDStr,
 		RoomID:   roomID,
 		Username: usernameStr,

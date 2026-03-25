@@ -63,6 +63,8 @@ go run cmd/main.go
 
 The server will start and listen on the port specified in your `.env` file.
 
+Redis is now required for WebSocket message fanout. Set `REDIS_ADDR` and optionally `REDIS_PASSWORD` and `REDIS_DB` before starting the backend.
+
 ### 6. Testing
 
 You can use tools like [Postman](https://www.postman.com/) or [curl](https://curl.se/) to interact with the REST endpoints and WebSocket clients for real-time messaging.

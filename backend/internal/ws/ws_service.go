@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 )
@@ -35,8 +36,7 @@ func (s *service) FetchRooms() error {
 	}
 
 	for _, room := range rooms {
-		room.Clients = make(map[string]*Client)
-		s.hub.Rooms[room.ID] = room
+		s.hub.AddRoom(room)
 	}
 
 	return nil
@@ -55,8 +55,7 @@ func (s *service) CreateRoom(c context.Context, req *CreateRoomReq) (*CreateRoom
 		return nil, err
 	}
 
-	room.Clients = make(map[string]*Client)
-	s.hub.Rooms[room.ID] = room
+	s.hub.AddRoom(room)
 
 	return &CreateRoomRes{
 		ID:   room.ID,
@@ -70,29 +69,28 @@ func (s *service) JoinRoom(c context.Context, cl *Client, m *Message) error {
 		return err
 	}
 
-	// Register new client through the register channel
-	s.hub.Register <- cl
-	// Broadcast the message
-	s.hub.Broadcast <- m
-
 	history, err := s.Repository.FetchRoomMessages(c, cl.RoomID)
 	if err != nil {
-		// TODO: Notify client about error
-		log.Printf("Failed to fetch room messages: %v", err)
+		log.Printf("ws: fetch room messages: %v", err)
+	}
+
+	if ok := s.hub.Register(cl); !ok {
+		return errors.New("room not found")
 	}
 
 	go cl.WriteMessage()
 
-	// Send chat history to the client
-	// Add a small delay to prevent race condition
-	// TODO: Implement system messages to handle synchronization
-	go func() {
-		time.Sleep(5000 * time.Millisecond)
-		for _, msg := range history {
-			cl.Message <- msg
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
+	for _, msg := range history {
+		cl.Message <- msg
+	}
+
+	ctx, cancel := context.WithTimeout(c, s.timeout)
+	defer cancel()
+
+	if err := s.hub.Publish(ctx, m); err != nil {
+		s.hub.Remove(cl)
+		return err
+	}
 
 	cl.ReadMessage(s.hub)
 
@@ -100,31 +98,9 @@ func (s *service) JoinRoom(c context.Context, cl *Client, m *Message) error {
 }
 
 func (s *service) GetRooms(ctx context.Context) (r []RoomRes) {
-	var rooms []RoomRes
-	for _, room := range s.hub.Rooms {
-		rooms = append(rooms, RoomRes{
-			ID:   room.ID,
-			Name: room.Name,
-		})
-	}
-
-	return rooms
+	return s.hub.RoomsSnapshot()
 }
 
 func (s *service) GetClients(ctx context.Context, roomID string) (c []ClientRes) {
-	var clients []ClientRes
-
-	if _, ok := s.hub.Rooms[roomID]; !ok {
-		clients = make([]ClientRes, 0)
-		return clients
-	}
-
-	for _, c := range s.hub.Rooms[roomID].Clients {
-		clients = append(clients, ClientRes{
-			ID:       c.ID,
-			Username: c.Username,
-		})
-	}
-
-	return clients
+	return s.hub.ClientsSnapshot(roomID)
 }

@@ -1,7 +1,9 @@
 package ws
 
 import (
+	"context"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -34,14 +36,16 @@ func (cl *Client) WriteMessage() {
 			return
 		}
 
-		cl.Conn.WriteJSON(message)
+		if err := cl.Conn.WriteJSON(message); err != nil {
+			return
+		}
 	}
 }
 
 // Read message from frontend
 func (cl *Client) ReadMessage(hub *Hub) {
 	defer func() {
-		hub.Unregister <- cl
+		hub.Unregister(cl)
 		cl.Conn.Close()
 	}()
 
@@ -61,6 +65,12 @@ func (cl *Client) ReadMessage(hub *Hub) {
 			UserID:   cl.ID,
 		}
 
-		hub.Broadcast <- msg
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err = hub.Publish(ctx, msg)
+		cancel()
+		if err != nil {
+			log.Printf("ws: publish message: %v", err)
+			break
+		}
 	}
 }
