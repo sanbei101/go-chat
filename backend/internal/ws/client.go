@@ -5,7 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 type Client struct {
@@ -27,7 +28,7 @@ type Message struct {
 // for passing to frontend
 func (cl *Client) WriteMessage() {
 	defer func() {
-		cl.Conn.Close()
+		cl.Conn.CloseNow()
 	}()
 
 	for {
@@ -36,7 +37,10 @@ func (cl *Client) WriteMessage() {
 			return
 		}
 
-		if err := cl.Conn.WriteJSON(message); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err := wsjson.Write(ctx, cl.Conn, message)
+		cancel()
+		if err != nil {
 			return
 		}
 	}
@@ -46,14 +50,15 @@ func (cl *Client) WriteMessage() {
 func (cl *Client) ReadMessage(hub *Hub) {
 	defer func() {
 		hub.Unregister(cl)
-		cl.Conn.Close()
+		cl.Conn.CloseNow()
 	}()
 
 	for {
-		_, m, err := cl.Conn.ReadMessage()
+		_, m, err := cl.Conn.Read(context.Background())
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+			status := websocket.CloseStatus(err)
+			if status != websocket.StatusNormalClosure && status != websocket.StatusGoingAway {
+				log.Printf("ws: read message: %v", err)
 			}
 			break
 		}

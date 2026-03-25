@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
@@ -33,16 +33,10 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 func (h *Handler) JoinRoom(c *gin.Context) {
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,9 +63,9 @@ func (h *Handler) JoinRoom(c *gin.Context) {
 
 	err = h.Service.JoinRoom(c.Request.Context(), cl, m)
 	if err != nil {
-		log.Fatalf("Error joining room: %s", err.Error())
-		conn.Close()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join room!"})
+		log.Printf("Error joining room: %s", err.Error())
+		conn.Close(websocket.StatusInternalError, "failed to join room")
+		return
 	}
 }
 
