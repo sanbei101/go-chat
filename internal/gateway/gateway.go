@@ -59,7 +59,7 @@ func New(auth AuthFunc, publisher Publisher) *Gateway {
 	}
 }
 
-func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	if g.auth == nil {
 		http.Error(w, "gateway auth is not configured", http.StatusInternalServerError)
 		return
@@ -146,15 +146,16 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
 			continue
 		}
-		if g.publisher != nil {
-			if err := g.publisher.Publish(r.Context(), &InboundEnvelope{Message: msg, Binary: bin}); err != nil {
-				log.Error().Err(err).Str("user_id", userID).Msg("gateway publish message failed")
-			}
+		if g.publisher == nil {
+			continue
+		}
+		if err := g.publisher.Publish(r.Context(), &InboundEnvelope{Message: msg, Binary: bin}); err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("gateway publish message failed")
 		}
 	}
 }
 
-func (g *Gateway) Push(ctx context.Context, userID string, msg *proto.ChatMessage) error {
+func (g *Gateway) HandleWorkerMessage(ctx context.Context, userID string, msg *proto.ChatMessage) error {
 	g.mu.RLock()
 	userConns := g.conns[userID]
 	clients := make([]*client, 0, len(userConns))

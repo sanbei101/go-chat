@@ -86,7 +86,7 @@ func (s *GatewayGRPCServer) DeliverMessage(ctx context.Context, req *proto.Deliv
 	if req == nil || req.Message == nil {
 		return &proto.DeliverMessageResponse{}, nil
 	}
-	if err := s.gw.Push(ctx, req.Message.GetReceiverId(), req.Message); err != nil && !errors.Is(err, gateway.ErrUserNotFound) {
+	if err := s.gw.HandleWorkerMessage(ctx, req.Message.GetReceiverId(), req.Message); err != nil && !errors.Is(err, gateway.ErrUserNotFound) {
 		return nil, err
 	}
 	return &proto.DeliverMessageResponse{}, nil
@@ -94,7 +94,7 @@ func (s *GatewayGRPCServer) DeliverMessage(ctx context.Context, req *proto.Deliv
 
 func buildMux(cfg *config.Config, gw *gateway.Gateway) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle(cfg.Gateway.Path, gw)
+	mux.HandleFunc(cfg.Gateway.Path, gw.HandleUserMessage)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
