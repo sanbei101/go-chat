@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "./;proto";
+
+enum ChatType {
+  CHAT_TYPE_INVALID = 0;
+  CHAT_TYPE_SINGLE = 1;
+  CHAT_TYPE_GROUP = 2;
+  CHAT_TYPE_ROOM = 3;
+}
+
+message ChatMessage {
+  string msg_id = 1;
+  string client_msg_id = 2;
+  string sender_id = 3;
+  string receiver_id = 4;
+  ChatType chat_type = 5;
+  int64 server_time = 6;
+
+  oneof payload {
+    TextPayload text = 10;
+    ImagePayload image = 11;
+    VoicePayload voice = 12;
+    VideoPayload video = 13;
+    FilePayload file = 14;
+    SystemPayload system = 15;
+  }
+
+  string reply_to_msg_id = 20;
+  map<string, string> ext = 21;
+}
+
+message SendMessageRequest {
+  ChatMessage message = 1;
+}
+
+message SendMessageResponse {
+  ChatMessage message = 1;
+}
+
+message DeliverMessageRequest {
+  ChatMessage message = 1;
+}
+
+message DeliverMessageResponse {}
+
+message TextPayload {
+  string content = 1;
+  repeated string mention_uids = 2;
+}
+
+message ImagePayload {
+  string url = 1;
+  string thumb_url = 2;
+  int32 width = 3;
+  int32 height = 4;
+  int32 size_bytes = 5;
+  string format = 6;
+}
+
+message VoicePayload {
+  string url = 1;
+  int32 duration = 2;
+  int32 size_bytes = 3;
+  string format = 4;
+}
+
+message VideoPayload {
+  string video_url = 1;
+  string cover_url = 2;
+  int32 duration = 3;
+  int32 width = 4;
+  int32 height = 5;
+  int32 size_bytes = 6;
+  string format = 7;
+}
+
+message FilePayload {
+  string url = 1;
+  string file_name = 2;
+  int32 size_bytes = 3;
+  string format = 4;
+}
+
+message SystemPayload {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_MSG_RECALL = 1;
+    ACTION_GROUP_JOIN = 2;
+    ACTION_GROUP_KICK = 3;
+  }
+  Action action = 1;
+  string operator_id = 2;
+  string target_id = 3;
+  string text = 4;
+}
+
+service WorkerService {
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+}
+
+service GatewayService {
+  rpc DeliverMessage(DeliverMessageRequest) returns (DeliverMessageResponse);
+}
