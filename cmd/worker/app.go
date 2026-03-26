@@ -16,7 +16,7 @@ import (
 
 type App struct {
 	Config       *config.Config
-	Worker       *worker.Worker
+	Worker       *worker.Service
 	GRPCServer   *grpc.Server
 	GRPCListener net.Listener
 }
@@ -57,7 +57,7 @@ func (a *App) Run(ctx context.Context) error {
 
 type WorkerGRPCServer struct {
 	proto.UnimplementedWorkerServiceServer
-	worker *worker.Worker
+	worker *worker.Service
 }
 
 func (s *WorkerGRPCServer) SendMessage(ctx context.Context, req *proto.SendMessageRequest) (*proto.SendMessageResponse, error) {
@@ -65,9 +65,11 @@ func (s *WorkerGRPCServer) SendMessage(ctx context.Context, req *proto.SendMessa
 		return &proto.SendMessageResponse{}, nil
 	}
 
-	msg, err := s.worker.Process(ctx, req.Message)
+	delivery, err := s.worker.Process(ctx, &worker.InboundEnvelope{
+		Message: req.Message,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &proto.SendMessageResponse{Message: msg}, nil
+	return &proto.SendMessageResponse{Message: delivery.Message}, nil
 }

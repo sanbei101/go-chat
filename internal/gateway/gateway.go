@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/phuslu/log"
 	"google.golang.org/protobuf/encoding/protojson"
+	gproto "google.golang.org/protobuf/proto"
 
 	proto "github.com/sanbei101/im/pkg/protocol"
 )
@@ -29,17 +31,34 @@ var (
 // AuthFunc 用于在握手阶段完成鉴权，并返回当前连接所属的用户 ID。
 type AuthFunc func(ctx context.Context, r *http.Request, token string) (string, error)
 
-// MessageHandler 用于处理客户端上行消息，例如转发到 MQ。
-type MessageHandler func(ctx context.Context, msg *proto.ChatMessage) error
+// InboundEnvelope 表示网关收到的上行消息。
+// Message 供业务流程使用，Binary 供 MQ 或其他传输层复用 protobuf 二进制。
+type InboundEnvelope struct {
+	Message *proto.ChatMessage
+	Binary  []byte
+}
 
-// Gateway 封装 WebSocket 连接管理与消息收发逻辑。
+// Publisher 负责把网关收到的消息继续投递到下游处理模块。
+type Publisher interface {
+	Publish(ctx context.Context, envelope *InboundEnvelope) error
+}
+
+type PublisherFunc func(ctx context.Context, envelope *InboundEnvelope) error
+
+func (f PublisherFunc) Publish(ctx context.Context, envelope *InboundEnvelope) error {
+	return f(ctx, envelope)
+}
+
+// Gateway 封装 WebSocket 连接管理、上行接入与下行投递逻辑。
 type Gateway struct {
 	auth             AuthFunc
-	onMessage        MessageHandler
+	publisher        Publisher
 	acceptOptions    *websocket.AcceptOptions
 	handshakeTimeout time.Duration
 	writeTimeout     time.Duration
 	sendQueueSize    int
+	now              func() time.Time
+	newID            func() (uuid.UUID, error)
 
 	mu    sync.RWMutex
 	conns map[string]map[*client]struct{}
@@ -89,13 +108,15 @@ func WithSendQueueSize(size int) Option {
 }
 
 // New 创建一个新的消息网关实例。
-func New(auth AuthFunc, onMessage MessageHandler, opts ...Option) *Gateway {
+func New(auth AuthFunc, publisher Publisher, opts ...Option) *Gateway {
 	g := &Gateway{
 		auth:             auth,
-		onMessage:        onMessage,
+		publisher:        publisher,
 		handshakeTimeout: defaultHandshakeTimeout,
 		writeTimeout:     defaultWriteTimeout,
 		sendQueueSize:    defaultSendQueueSize,
+		now:              time.Now,
+		newID:            uuid.NewV7,
 		conns:            make(map[string]map[*client]struct{}),
 	}
 	for _, opt := range opts {
@@ -206,19 +227,17 @@ func (g *Gateway) readLoop(parent context.Context, c *client) error {
 			return err
 		}
 
-		msg := &proto.ChatMessage{}
-		if err := protojson.Unmarshal(payload, msg); err != nil {
-			log.Warn().Err(err).Str("user_id", c.userID).Msg("gateway unmarshal message failed")
+		envelope, err := g.buildInboundEnvelope(c.userID, payload)
+		if err != nil {
+			log.Warn().Err(err).Str("user_id", c.userID).Msg("gateway decode message failed")
 			continue
 		}
 
-		// 发送者身份由网关注入，避免客户端伪造。
-		msg.SenderId = c.userID
-		if g.onMessage == nil {
+		if g.publisher == nil {
 			continue
 		}
-		if err := g.onMessage(parent, msg); err != nil {
-			log.Error().Err(err).Str("user_id", c.userID).Msg("gateway handle message failed")
+		if err := g.publisher.Publish(parent, envelope); err != nil {
+			log.Error().Err(err).Str("user_id", c.userID).Msg("gateway publish message failed")
 		}
 	}
 }
@@ -236,6 +255,48 @@ func (g *Gateway) writeLoop(c *client) {
 			return
 		}
 	}
+}
+
+func (g *Gateway) buildInboundEnvelope(userID string, payload []byte) (*InboundEnvelope, error) {
+	msg, err := decodeInboundMessage(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	msg.SenderId = userID
+	if msg.MsgId == "" {
+		id, err := g.newID()
+		if err != nil {
+			return nil, err
+		}
+		msg.MsgId = id.String()
+	}
+	if msg.ServerTime == 0 {
+		msg.ServerTime = g.now().UnixNano()
+	}
+
+	bin, err := gproto.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &InboundEnvelope{
+		Message: msg,
+		Binary:  bin,
+	}, nil
+}
+
+func decodeInboundMessage(payload []byte) (*proto.ChatMessage, error) {
+	req := &proto.SendMessageRequest{}
+	if err := protojson.Unmarshal(payload, req); err == nil && req.GetMessage() != nil {
+		return req.GetMessage(), nil
+	}
+
+	msg := &proto.ChatMessage{}
+	if err := protojson.Unmarshal(payload, msg); err != nil {
+		return nil, err
+	}
+	return msg, nil
 }
 
 func (g *Gateway) addClient(c *client) {

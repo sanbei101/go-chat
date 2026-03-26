@@ -2,60 +2,108 @@ package worker
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
+
+	"github.com/google/uuid"
+	gproto "google.golang.org/protobuf/proto"
 
 	proto "github.com/sanbei101/im/pkg/protocol"
 )
 
-// Handler 用于承接持久化、未读数计算等重逻辑。
-type Handler func(ctx context.Context, msg *proto.ChatMessage) (*proto.ChatMessage, error)
-
-// Deliverer 负责将处理后的消息投递给网关服务。
-type Deliverer func(ctx context.Context, msg *proto.ChatMessage) error
-
-// Worker 负责处理网关上送的消息，并在处理后回投到网关。
-type Worker struct {
-	handler   Handler
-	deliverer Deliverer
+// InboundEnvelope 表示 worker 从网关拿到的待处理消息。
+type InboundEnvelope struct {
+	Message *proto.ChatMessage
+	Binary  []byte
 }
 
-func New(handler Handler, deliverer Deliverer) *Worker {
-	return &Worker{
-		handler:   handler,
-		deliverer: deliverer,
+// DeliveryEnvelope 表示 worker 完成落库后生成的投递指令。
+type DeliveryEnvelope struct {
+	Message *proto.ChatMessage
+	Binary  []byte
+}
+
+// MessageStore 负责消息持久化。
+type MessageStore interface {
+	Save(ctx context.Context, msg *proto.ChatMessage) error
+}
+
+// DeliveryPublisher 负责把投递指令发回网关。
+type DeliveryPublisher interface {
+	Publish(ctx context.Context, envelope *DeliveryEnvelope) error
+}
+
+type DeliveryPublisherFunc func(ctx context.Context, envelope *DeliveryEnvelope) error
+
+func (f DeliveryPublisherFunc) Publish(ctx context.Context, envelope *DeliveryEnvelope) error {
+	return f(ctx, envelope)
+}
+
+// Service 负责执行 worker 的核心处理链路。
+type Service struct {
+	store     MessageStore
+	publisher DeliveryPublisher
+	now       func() time.Time
+	newID     func() (uuid.UUID, error)
+}
+
+func New(store MessageStore, publisher DeliveryPublisher) *Service {
+	return &Service{
+		store:     store,
+		publisher: publisher,
+		now:       time.Now,
+		newID:     uuid.NewV7,
 	}
 }
 
-func (w *Worker) Process(ctx context.Context, msg *proto.ChatMessage) (*proto.ChatMessage, error) {
-	var err error
-	if w.handler != nil {
-		msg, err = w.handler(ctx, msg)
+// Process 执行“补齐字段 -> 落库 -> 生成投递指令 -> 投递回网关”。
+func (s *Service) Process(ctx context.Context, envelope *InboundEnvelope) (*DeliveryEnvelope, error) {
+	if envelope == nil || envelope.Message == nil {
+		return nil, errors.New("worker: message is nil")
+	}
+
+	msg, err := s.decorate(envelope.Message)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.store == nil {
+		return nil, errors.New("worker: store is nil")
+	}
+	if err := s.store.Save(ctx, msg); err != nil {
+		return nil, err
+	}
+
+	delivery := &DeliveryEnvelope{
+		Message: msg,
+		Binary:  envelope.Binary,
+	}
+	if len(delivery.Binary) == 0 {
+		delivery.Binary, err = gproto.Marshal(msg)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		msg = decorateMessage(msg)
 	}
 
-	if w.deliverer != nil {
-		if err := w.deliverer(ctx, msg); err != nil {
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, delivery); err != nil {
 			return nil, err
 		}
 	}
 
-	return msg, nil
+	return delivery, nil
 }
 
-func decorateMessage(msg *proto.ChatMessage) *proto.ChatMessage {
-	if msg == nil {
-		msg = &proto.ChatMessage{}
-	}
+func (s *Service) decorate(msg *proto.ChatMessage) (*proto.ChatMessage, error) {
 	if msg.MsgId == "" {
-		msg.MsgId = fmt.Sprintf("%d", time.Now().UnixNano())
+		id, err := s.newID()
+		if err != nil {
+			return nil, err
+		}
+		msg.MsgId = id.String()
 	}
 	if msg.ServerTime == 0 {
-		msg.ServerTime = time.Now().UnixMilli()
+		msg.ServerTime = s.now().UnixNano()
 	}
-	return msg
+	return msg, nil
 }

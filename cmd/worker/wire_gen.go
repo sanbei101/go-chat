@@ -39,8 +39,8 @@ func initializeWorkerApp(path string) (*App, func(), error) {
 		return nil, nil, err
 	}
 	gatewayServiceClient := provideGatewayServiceClient(clientConn)
-	deliverer := provideDeliverer(gatewayServiceClient)
-	workerWorker := provideWorker(queries, deliverer)
+	publisher := provideDeliveryPublisher(gatewayServiceClient)
+	workerWorker := provideWorker(queries, publisher)
 	listener, err := provideGRPCListener(config)
 	if err != nil {
 		cleanup2()
@@ -94,22 +94,22 @@ func provideGatewayServiceClient(conn *grpc.ClientConn) proto.GatewayServiceClie
 	return proto.NewGatewayServiceClient(conn)
 }
 
-func provideDeliverer(client proto.GatewayServiceClient) worker.Deliverer {
-	return func(ctx context.Context, msg *proto.ChatMessage) error {
-		_, err := client.DeliverMessage(ctx, &proto.DeliverMessageRequest{Message: msg})
+func provideDeliveryPublisher(client proto.GatewayServiceClient) worker.DeliveryPublisher {
+	return worker.DeliveryPublisherFunc(func(ctx context.Context, envelope *worker.DeliveryEnvelope) error {
+		_, err := client.DeliverMessage(ctx, &proto.DeliverMessageRequest{Message: envelope.Message})
 		return err
-	}
+	})
 }
 
-func provideWorker(queries *db.Queries, deliverer worker.Deliverer) *worker.Worker {
-	return worker.New(worker.NewPersistHandler(queries), deliverer)
+func provideWorker(queries *db.Queries, publisher worker.DeliveryPublisher) *worker.Service {
+	return worker.New(worker.NewPostgresMessageStore(queries), publisher)
 }
 
 func provideGRPCListener(cfg *config.Config) (net.Listener, error) {
 	return net.Listen("tcp", cfg.Worker.GRPCAddr)
 }
 
-func provideWorkerGRPCServer(w *worker.Worker) *WorkerGRPCServer {
+func provideWorkerGRPCServer(w *worker.Service) *WorkerGRPCServer {
 	return &WorkerGRPCServer{worker: w}
 }
 
@@ -119,7 +119,7 @@ func provideGRPCServer(svc *WorkerGRPCServer) *grpc.Server {
 	return server
 }
 
-func provideApp(cfg *config.Config, w *worker.Worker, grpcServer *grpc.Server, grpcListener net.Listener) *App {
+func provideApp(cfg *config.Config, w *worker.Service, grpcServer *grpc.Server, grpcListener net.Listener) *App {
 	return &App{
 		Config:       cfg,
 		Worker:       w,

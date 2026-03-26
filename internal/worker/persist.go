@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -13,50 +11,27 @@ import (
 	proto "github.com/sanbei101/im/pkg/protocol"
 )
 
-type PersistHandler struct {
+type PostgresMessageStore struct {
 	queries *db.Queries
-	now     func() time.Time
-	newID   func() string
 }
 
-func NewPersistHandler(queries *db.Queries) Handler {
-	return (&PersistHandler{
+func NewPostgresMessageStore(queries *db.Queries) MessageStore {
+	return &PostgresMessageStore{
 		queries: queries,
-		now:     time.Now,
-		newID:   func() string { return fmt.Sprintf("%d", time.Now().UnixNano()) },
-	}).Handle
+	}
 }
 
-// Handle 负责补齐基础字段并把消息落库。
-func (h *PersistHandler) Handle(ctx context.Context, msg *proto.ChatMessage) (*proto.ChatMessage, error) {
+// Save 负责把 worker 已经标准化过的消息落库。
+func (h *PostgresMessageStore) Save(ctx context.Context, msg *proto.ChatMessage) error {
 	if h.queries == nil {
-		return nil, errors.New("worker: queries is nil")
+		return errors.New("worker: queries is nil")
 	}
-
-	msg = h.decorate(msg)
 
 	params, err := buildCreateMessageParams(msg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := h.queries.CreateMessage(ctx, params); err != nil {
-		return nil, err
-	}
-	return msg, nil
-}
-
-func (h *PersistHandler) decorate(msg *proto.ChatMessage) *proto.ChatMessage {
-	if msg == nil {
-		msg = &proto.ChatMessage{}
-	}
-	now := h.now()
-	if msg.MsgId == "" {
-		msg.MsgId = h.newID()
-	}
-	if msg.ServerTime == 0 {
-		msg.ServerTime = now.UnixMilli()
-	}
-	return msg
+	return h.queries.CreateMessage(ctx, params)
 }
 
 func buildCreateMessageParams(msg *proto.ChatMessage) (db.CreateMessageParams, error) {

@@ -32,8 +32,8 @@ func initializeGatewayApp(path string) (*App, func(), error) {
 	}
 	workerServiceClient := provideWorkerServiceClient(clientConn)
 	authFunc := provideGatewayAuthFunc()
-	messageHandler := provideGatewayMessageHandler(workerServiceClient)
-	gatewayGateway := provideGateway(config, authFunc, messageHandler)
+	publisher := provideGatewayPublisher(workerServiceClient)
+	gatewayGateway := provideGateway(config, authFunc, publisher)
 	handler := provideHTTPHandler(config, gatewayGateway)
 	server := provideHTTPServer(config, handler)
 	listener, err := provideGRPCListener(config)
@@ -67,21 +67,21 @@ func provideWorkerServiceClient(conn *grpc.ClientConn) proto.WorkerServiceClient
 	return proto.NewWorkerServiceClient(conn)
 }
 
-func provideGatewayMessageHandler(client proto.WorkerServiceClient) gateway.MessageHandler {
-	return func(ctx context.Context, msg *proto.ChatMessage) error {
-		_, err := client.SendMessage(ctx, &proto.SendMessageRequest{Message: msg})
+func provideGatewayPublisher(client proto.WorkerServiceClient) gateway.Publisher {
+	return gateway.PublisherFunc(func(ctx context.Context, envelope *gateway.InboundEnvelope) error {
+		_, err := client.SendMessage(ctx, &proto.SendMessageRequest{Message: envelope.Message})
 		return err
-	}
+	})
 }
 
 func provideGatewayAuthFunc() gateway.AuthFunc {
 	return authFromRequest
 }
 
-func provideGateway(cfg *config.Config, auth gateway.AuthFunc, handler gateway.MessageHandler) *gateway.Gateway {
+func provideGateway(cfg *config.Config, auth gateway.AuthFunc, publisher gateway.Publisher) *gateway.Gateway {
 	return gateway.New(
 		auth,
-		handler,
+		publisher,
 		gateway.WithHandshakeTimeout(cfg.Gateway.HandshakeTimeout),
 		gateway.WithWriteTimeout(cfg.Gateway.WriteTimeout),
 		gateway.WithSendQueueSize(cfg.Gateway.SendQueueSize),
