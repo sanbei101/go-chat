@@ -43,14 +43,8 @@ func provideGatewayAuthFunc() gateway.AuthFunc {
 	return authFromRequest
 }
 
-func provideGateway(cfg *config.Config, auth gateway.AuthFunc, publisher gateway.Publisher) *gateway.Gateway {
-	return gateway.New(
-		auth,
-		publisher,
-		gateway.WithHandshakeTimeout(cfg.Gateway.HandshakeTimeout),
-		gateway.WithWriteTimeout(cfg.Gateway.WriteTimeout),
-		gateway.WithSendQueueSize(cfg.Gateway.SendQueueSize),
-	)
+func provideGateway(_ *config.Config, auth gateway.AuthFunc, publisher gateway.Publisher) *gateway.Gateway {
+	return gateway.New(auth, publisher)
 }
 
 func provideHTTPHandler(cfg *config.Config, gw *gateway.Gateway) http.Handler {

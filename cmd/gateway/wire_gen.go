@@ -8,15 +8,13 @@ package main
 
 import (
 	"context"
-	"net"
-	"net/http"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/sanbei101/im/internal/gateway"
 	"github.com/sanbei101/im/pkg/config"
-	proto "github.com/sanbei101/im/pkg/protocol"
+	"github.com/sanbei101/im/pkg/protocol"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"net"
+	"net/http"
 )
 
 // Injectors from wire.go:
@@ -26,24 +24,24 @@ func initializeGatewayApp(path string) (*App, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	authFunc := provideGatewayAuthFunc()
 	clientConn, cleanup, err := provideWorkerConn(config)
 	if err != nil {
 		return nil, nil, err
 	}
 	workerServiceClient := provideWorkerServiceClient(clientConn)
-	authFunc := provideGatewayAuthFunc()
 	publisher := provideGatewayPublisher(workerServiceClient)
-	gatewayGateway := provideGateway(config, authFunc, publisher)
-	handler := provideHTTPHandler(config, gatewayGateway)
+	gateway := provideGateway(config, authFunc, publisher)
+	handler := provideHTTPHandler(config, gateway)
 	server := provideHTTPServer(config, handler)
+	gatewayGRPCServer := provideGatewayGRPCServer(gateway)
+	grpcServer := provideGRPCServer(gatewayGRPCServer)
 	listener, err := provideGRPCListener(config)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	gatewayGRPCServer := provideGatewayGRPCServer(gatewayGateway)
-	server2 := provideGRPCServer(gatewayGRPCServer)
-	app := provideApp(config, gatewayGateway, server, server2, listener)
+	app := provideApp(config, gateway, server, grpcServer, listener)
 	return app, func() {
 		cleanup()
 	}, nil
@@ -78,14 +76,8 @@ func provideGatewayAuthFunc() gateway.AuthFunc {
 	return authFromRequest
 }
 
-func provideGateway(cfg *config.Config, auth gateway.AuthFunc, publisher gateway.Publisher) *gateway.Gateway {
-	return gateway.New(
-		auth,
-		publisher,
-		gateway.WithHandshakeTimeout(cfg.Gateway.HandshakeTimeout),
-		gateway.WithWriteTimeout(cfg.Gateway.WriteTimeout),
-		gateway.WithSendQueueSize(cfg.Gateway.SendQueueSize),
-	)
+func provideGateway(_ *config.Config, auth gateway.AuthFunc, publisher gateway.Publisher) *gateway.Gateway {
+	return gateway.New(auth, publisher)
 }
 
 func provideHTTPHandler(cfg *config.Config, gw *gateway.Gateway) http.Handler {
