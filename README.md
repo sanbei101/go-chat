@@ -45,3 +45,31 @@ buf format -w .
 # 然后生成Go代码
 protoc --go_out=. *.proto
 ```
+
+## 代码逻辑
+1.前端发送消息(JSON 格式)
+```json
+{
+  "message": {
+    "msg_id": "后端生成的uuidv7",
+    "client_msg_id": "前端生成的uuidv7" // 保证幂等性,
+    "sender_id": "user_1001",
+    "receiver_id": "user_1002",
+    "chat_type": "CHAT_TYPE_SINGLE",
+    "server_time": 1743020000000000000,
+    "text": {
+      "content": "你好",
+    },
+  }
+}
+```
+
+2. 网关接收消息
+职责:接收 JSON -> 补全核心参数(msg_id,server_time) -> 转成 Protobuf 二进制 -> 丢进 Redis Stream
+
+3. 工作线程处理消息
+职责:从 Redis Stream 拉取消息 -> 持久化到 PostgreSQL -> 生成投递指令 -> 丢回 Redis Stream
+
+
+4. 目标网关推送给接收方
+职责:监听 Redis Stream 的投递指令 -> 定位接收方在线连接 -> 推送消息(先不考虑离线)

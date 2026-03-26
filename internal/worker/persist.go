@@ -97,8 +97,6 @@ func toDBChatType(t proto.ChatType) db.ChatType {
 	switch t {
 	case proto.ChatType_CHAT_TYPE_GROUP:
 		return db.ChatTypeGroup
-	case proto.ChatType_CHAT_TYPE_ROOM:
-		return db.ChatTypeRoom
 	default:
 		return db.ChatTypeSingle
 	}

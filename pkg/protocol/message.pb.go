@@ -27,7 +27,6 @@ const (
 	ChatType_CHAT_TYPE_INVALID ChatType = 0
 	ChatType_CHAT_TYPE_SINGLE  ChatType = 1
 	ChatType_CHAT_TYPE_GROUP   ChatType = 2
-	ChatType_CHAT_TYPE_ROOM    ChatType = 3
 )
 
 // Enum value maps for ChatType.
@@ -36,13 +35,11 @@ var (
 		0: "CHAT_TYPE_INVALID",
 		1: "CHAT_TYPE_SINGLE",
 		2: "CHAT_TYPE_GROUP",
-		3: "CHAT_TYPE_ROOM",
 	}
 	ChatType_value = map[string]int32{
 		"CHAT_TYPE_INVALID": 0,
 		"CHAT_TYPE_SINGLE":  1,
 		"CHAT_TYPE_GROUP":   2,
-		"CHAT_TYPE_ROOM":    3,
 	}
 )
 
@@ -1011,12 +1008,11 @@ const file_message_proto_rawDesc = "" +
 	"\x12ACTION_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ACTION_MSG_RECALL\x10\x01\x12\x15\n" +
 	"\x11ACTION_GROUP_JOIN\x10\x02\x12\x15\n" +
-	"\x11ACTION_GROUP_KICK\x10\x03*`\n" +
+	"\x11ACTION_GROUP_KICK\x10\x03*L\n" +
 	"\bChatType\x12\x15\n" +
 	"\x11CHAT_TYPE_INVALID\x10\x00\x12\x14\n" +
 	"\x10CHAT_TYPE_SINGLE\x10\x01\x12\x13\n" +
-	"\x0fCHAT_TYPE_GROUP\x10\x02\x12\x12\n" +
-	"\x0eCHAT_TYPE_ROOM\x10\x032U\n" +
+	"\x0fCHAT_TYPE_GROUP\x10\x022U\n" +
 	"\rWorkerService\x12D\n" +
 	"\vSendMessage\x12\x19.proto.SendMessageRequest\x1a\x1a.proto.SendMessageResponse2_\n" +
 	"\x0eGatewayService\x12M\n" +

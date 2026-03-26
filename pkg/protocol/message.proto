@@ -8,7 +8,6 @@ enum ChatType {
   CHAT_TYPE_INVALID = 0;
   CHAT_TYPE_SINGLE = 1;
   CHAT_TYPE_GROUP = 2;
-  CHAT_TYPE_ROOM = 3;
 }
 
 message ChatMessage {
