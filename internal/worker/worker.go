@@ -48,7 +48,7 @@ func (s *Service) Run(ctx context.Context) {
 }
 
 func (s *Service) processInbound(ctx context.Context) {
-	streamID := "0"
+	streamID := "$"
 	result, err := s.redis.XRead(ctx, &redis.XReadArgs{
 		Streams: []string{"messages:inbound", streamID},
 		Count:   10,
