@@ -110,6 +110,7 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		message.ServerTime = time.Now().UnixMicro()
+		message.SenderID = uuid.MustParse(userID)
 		bin, err := json.Marshal(message)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")

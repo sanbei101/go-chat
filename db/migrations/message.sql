@@ -1,3 +1,4 @@
+-- Active: 1773747183783@@154.8.213.38@5433@database
 CREATE TYPE chat_type AS ENUM (
     'single',
     'group'

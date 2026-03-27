@@ -20,6 +20,7 @@ INSERT INTO messages (
     sender_id,
     receiver_id,
     chat_type,
+    msg_type,
     server_time,
     reply_to_msg_id,
     payload,
@@ -33,7 +34,8 @@ INSERT INTO messages (
     $6,
     $7,
     $8,
-    $9
+    $9,
+    $10
 )
 `
 
@@ -43,6 +45,7 @@ type CreateMessageParams struct {
 	SenderID     uuid.UUID       `json:"sender_id"`
 	ReceiverID   uuid.UUID       `json:"receiver_id"`
 	ChatType     ChatType        `json:"chat_type"`
+	MsgType      MessageType     `json:"msg_type"`
 	ServerTime   int64           `json:"server_time"`
 	ReplyToMsgID *uuid.UUID      `json:"reply_to_msg_id"`
 	Payload      json.RawMessage `json:"payload"`
@@ -56,6 +59,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 		arg.SenderID,
 		arg.ReceiverID,
 		arg.ChatType,
+		arg.MsgType,
 		arg.ServerTime,
 		arg.ReplyToMsgID,
 		arg.Payload,
@@ -71,6 +75,7 @@ SELECT
     sender_id,
     receiver_id,
     chat_type,
+    msg_type,
     server_time,
     reply_to_msg_id,
     payload,
@@ -87,6 +92,7 @@ type GetMessageByIDRow struct {
 	SenderID     uuid.UUID       `json:"sender_id"`
 	ReceiverID   uuid.UUID       `json:"receiver_id"`
 	ChatType     ChatType        `json:"chat_type"`
+	MsgType      MessageType     `json:"msg_type"`
 	ServerTime   int64           `json:"server_time"`
 	ReplyToMsgID *uuid.UUID      `json:"reply_to_msg_id"`
 	Payload      json.RawMessage `json:"payload"`
@@ -103,6 +109,7 @@ func (q *Queries) GetMessageByID(ctx context.Context, msgID uuid.UUID) (*GetMess
 		&i.SenderID,
 		&i.ReceiverID,
 		&i.ChatType,
+		&i.MsgType,
 		&i.ServerTime,
 		&i.ReplyToMsgID,
 		&i.Payload,
@@ -119,6 +126,7 @@ SELECT
     sender_id,
     receiver_id,
     chat_type,
+    msg_type,
     server_time,
     reply_to_msg_id,
     payload,
@@ -145,6 +153,7 @@ type ListMessagesByConversationRow struct {
 	SenderID     uuid.UUID       `json:"sender_id"`
 	ReceiverID   uuid.UUID       `json:"receiver_id"`
 	ChatType     ChatType        `json:"chat_type"`
+	MsgType      MessageType     `json:"msg_type"`
 	ServerTime   int64           `json:"server_time"`
 	ReplyToMsgID *uuid.UUID      `json:"reply_to_msg_id"`
 	Payload      json.RawMessage `json:"payload"`
@@ -172,6 +181,7 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessag
 			&i.SenderID,
 			&i.ReceiverID,
 			&i.ChatType,
+			&i.MsgType,
 			&i.ServerTime,
 			&i.ReplyToMsgID,
 			&i.Payload,

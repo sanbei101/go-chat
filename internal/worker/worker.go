@@ -80,6 +80,9 @@ func (s *Service) processInbound(ctx context.Context) {
 			}
 
 			if err := s.persist(ctx, &chatMsg); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
 				log.Error().Err(err).Str("msg_id", chatMsg.MsgID.String()).Msg("worker persist failed")
 				continue
 			}
@@ -98,6 +101,7 @@ func (s *Service) persist(ctx context.Context, msg *db.Message) error {
 		SenderID:     msg.SenderID,
 		ReceiverID:   msg.ReceiverID,
 		ChatType:     msg.ChatType,
+		MsgType:      msg.MsgType,
 		ServerTime:   msg.ServerTime,
 		ReplyToMsgID: msg.ReplyToMsgID,
 		Payload:      msg.Payload,
