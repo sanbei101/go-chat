@@ -2,7 +2,7 @@ import ws from 'k6/ws';
 import { check } from 'k6';
 
 export const options = {
-  vus: 1,
+  vus: 5,
   duration: '30s',
 };
 
@@ -22,33 +22,35 @@ const message = {
 const TEST_MESSAGE = JSON.stringify(message);
 
 export default function () {
+  let sendCount = 0;
+
   const res = ws.connect(WS_URL, { headers: REQ_HEADERS }, (socket) => {
 
     socket.on('open', () => {
       console.log(`[VU ${__VU}] 连接成功`);
-      socket.send(TEST_MESSAGE);
-      console.log(`[VU ${__VU}] 消息发送完成`);
+      socket.setInterval(() => {
+        socket.send(TEST_MESSAGE);
+        sendCount++;
+        
+        if (sendCount % 10 === 0) {
+          console.log(`[VU ${__VU}] 已发送 ${sendCount} 条`);
+        }
+      }, 100);
+      
+      socket.setTimeout(() => {
+        console.log(`[VU ${__VU}] 最终发送:${sendCount} 条`);
+        socket.close();
+      }, 30000);
     });
 
-    socket.on('message', (data) => {
-      console.log(`[VU ${__VU}] 收到: ${data}`);
+    socket.on('message', (msg) => {
+       if (sendCount % 10 === 0) {
+        console.log(`[VU ${__VU}] 收到消息: ${msg}`);
+       }
     });
-
-    socket.on('error', (e) => {
-      console.error(`[VU ${__VU}] 错误:`, e.error());
-    });
-
-    socket.on('close', () => {
-      console.log(`[VU ${__VU}] 断开连接`);
-    });
-
-    socket.setTimeout(() => {
-      socket.close();
-    }, 30000);
-
+    socket.on('error', (e) => console.error(`[VU ${__VU}] 错误`, e.error()));
+    socket.on('close', () => console.log(`[VU ${__VU}] 断开连接`));
   });
 
-  check(res, {
-    '握手成功 101': (r) => r && r.status === 101,
-  });
+  check(res, { '握手成功 101': (r) => r && r.status === 101 });
 }
