@@ -48,7 +48,6 @@ func (s *Service) Run(ctx context.Context) {
 }
 
 func (s *Service) processInbound(ctx context.Context) {
-	// 使用 "0" 起始 ID 而非 "$"，确保不错过任何消息
 	streamID := "0"
 	result, err := s.redis.XRead(ctx, &redis.XReadArgs{
 		Streams: []string{"messages:inbound", streamID},
@@ -56,22 +55,19 @@ func (s *Service) processInbound(ctx context.Context) {
 		Block:   time.Second,
 	}).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			// 无消息时短暂 sleep 避免 CPU 空转
-			time.Sleep(time.Second)
-			return
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Info().Msg("worker 收到退出信号，停止读取消息")
+		case errors.Is(err, redis.Nil):
+			log.Info().Msg("worker 暂无新消息，继续轮询")
+		default:
+			log.Error().Err(err).Msg("worker xread 读取失败")
 		}
-		if ctx.Err() != nil {
-			return
-		}
-		log.Error().Err(err).Msg("worker xread failed")
-		time.Sleep(time.Second)
 		return
 	}
 
 	for _, stream := range result {
 		for _, msg := range stream.Messages {
-			// 更新 streamID 为下一条消息的起始位置
 			streamID = msg.ID
 			data, ok := msg.Values["data"].(string)
 			if !ok {
