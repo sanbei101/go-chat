@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phuslu/log"
 	"github.com/redis/go-redis/v9"
@@ -14,19 +13,6 @@ import (
 	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/pkg/config"
 )
-
-// ChatMessage 是 gateway 与 worker 之间通过 Redis 传递的消息格式。
-type ChatMessage struct {
-	MsgID       string            `json:"msg_id"`
-	ClientMsgID string            `json:"client_msg_id"`
-	SenderID    string            `json:"sender_id"`
-	ReceiverID  string            `json:"receiver_id"`
-	ChatType    string            `json:"chat_type"`
-	ServerTime  int64             `json:"server_time"`
-	ReplyToMsgID string           `json:"reply_to_msg_id"`
-	Payload     json.RawMessage   `json:"payload"`
-	Ext         map[string]string `json:"ext"`
-}
 
 type Service struct {
 	redis   *redis.Client
@@ -82,72 +68,39 @@ func (s *Service) processInbound(ctx context.Context) {
 			if !ok {
 				continue
 			}
-			var chatMsg ChatMessage
+			var chatMsg db.Message
 			if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
 				log.Error().Err(err).Msg("worker unmarshal failed")
 				continue
 			}
 
 			if err := s.persist(ctx, &chatMsg); err != nil {
-				log.Error().Err(err).Str("msg_id", chatMsg.MsgID).Msg("worker persist failed")
+				log.Error().Err(err).Str("msg_id", chatMsg.MsgID.String()).Msg("worker persist failed")
 				continue
 			}
 
 			if err := s.publishDeliver(ctx, &chatMsg); err != nil {
-				log.Error().Err(err).Str("msg_id", chatMsg.MsgID).Msg("worker publish deliver failed")
+				log.Error().Err(err).Str("msg_id", chatMsg.MsgID.String()).Msg("worker publish deliver failed")
 			}
 		}
 	}
 }
 
-func (s *Service) persist(ctx context.Context, msg *ChatMessage) error {
-	if msg.MsgID == "" {
-		id, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		msg.MsgID = id.String()
-	}
-	if msg.ServerTime == 0 {
-		msg.ServerTime = time.Now().UnixNano()
-	}
-
-	msgUUID, err := uuid.Parse(msg.MsgID)
-	if err != nil {
-		return err
-	}
-
-	var clientUUID uuid.UUID
-	if msg.ClientMsgID != "" {
-		clientUUID, _ = uuid.Parse(msg.ClientMsgID)
-	}
-
-	var senderUUID, receiverUUID uuid.UUID
-	senderUUID, _ = uuid.Parse(msg.SenderID)
-	receiverUUID, _ = uuid.Parse(msg.ReceiverID)
-
-	var replyToUUID *uuid.UUID
-	if msg.ReplyToMsgID != "" {
-		u, _ := uuid.Parse(msg.ReplyToMsgID)
-		replyToUUID = &u
-	}
-
-	ext, _ := json.Marshal(msg.Ext)
-
+func (s *Service) persist(ctx context.Context, msg *db.Message) error {
 	return s.queries.CreateMessage(ctx, db.CreateMessageParams{
-		MsgID:        msgUUID,
-		ClientMsgID:  clientUUID,
-		SenderID:     senderUUID,
-		ReceiverID:   receiverUUID,
-		ChatType:     toDBChatType(msg.ChatType),
+		MsgID:        msg.MsgID,
+		ClientMsgID:  msg.ClientMsgID,
+		SenderID:     msg.SenderID,
+		ReceiverID:   msg.ReceiverID,
+		ChatType:     msg.ChatType,
 		ServerTime:   msg.ServerTime,
-		ReplyToMsgID: replyToUUID,
+		ReplyToMsgID: msg.ReplyToMsgID,
 		Payload:      msg.Payload,
-		Ext:          ext,
+		Ext:          msg.Ext,
 	})
 }
 
-func (s *Service) publishDeliver(ctx context.Context, msg *ChatMessage) error {
+func (s *Service) publishDeliver(ctx context.Context, msg *db.Message) error {
 	bin, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -156,11 +109,4 @@ func (s *Service) publishDeliver(ctx context.Context, msg *ChatMessage) error {
 		Stream: "messages:deliver",
 		Values: map[string]any{"data": string(bin)},
 	}).Err()
-}
-
-func toDBChatType(t string) db.ChatType {
-	if t == "group" {
-		return db.ChatTypeGroup
-	}
-	return db.ChatTypeSingle
 }

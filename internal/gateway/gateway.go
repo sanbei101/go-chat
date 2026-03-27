@@ -13,22 +13,10 @@ import (
 	"github.com/phuslu/log"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/jwt"
 )
-
-// ChatMessage 是 gateway 与 worker 之间通过 Redis 传递的消息格式。
-type ChatMessage struct {
-	MsgID       string            `json:"msg_id"`
-	ClientMsgID string            `json:"client_msg_id"`
-	SenderID    string            `json:"sender_id"`
-	ReceiverID  string            `json:"receiver_id"`
-	ChatType    string            `json:"chat_type"` // "single" or "group"
-	ServerTime  int64             `json:"server_time"`
-	ReplyToMsgID string           `json:"reply_to_msg_id"`
-	Payload     json.RawMessage   `json:"payload"`
-	Ext         map[string]string `json:"ext"`
-}
 
 type Gateway struct {
 	mu     sync.RWMutex
@@ -104,34 +92,37 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var msg ChatMessage
-		if err := json.Unmarshal(payload, &msg); err != nil {
-			log.Warn().Err(err).Str("user_id", userID).Msg("gateway decode message failed")
-			continue
+		var message db.Message
+		if err := json.Unmarshal(payload, &message); err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("gateway unmarshal message failed")
+			w.Write([]byte("invalid message format"))
+			return
 		}
 
-		msg.SenderID = userID
-		if msg.MsgID == "" {
-			id, err := uuid.NewV7()
-			if err != nil {
-				log.Error().Err(err).Str("user_id", userID).Msg("gateway generate msg id failed")
-				continue
-			}
-			msg.MsgID = id.String()
-		}
-		if msg.ServerTime == 0 {
-			msg.ServerTime = time.Now().UnixNano()
+		if message.ClientMsgID == uuid.Nil {
+			log.Error().Str("user_id", userID).Msg("gateway missing client_msg_id")
+			w.Write([]byte("missing client_msg_id"))
+			return
 		}
 
-		bin, err := json.Marshal(msg)
+		message.MsgID, err = uuid.NewV7()
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("gateway generate msg_id failed")
+			w.Write([]byte("failed to generate msg_id"))
+			return
+		}
+		message.ServerTime = time.Now().UnixMicro()
+		bin, err := json.Marshal(message)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
 			continue
 		}
+
 		err = g.redis.XAdd(readCtx, &redis.XAddArgs{
 			Stream: "messages:inbound",
 			Values: map[string]any{"data": string(bin)},
 		}).Err()
+
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway push message to redis failed")
 			continue
@@ -161,19 +152,20 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 					if !ok {
 						continue
 					}
-					var chatMsg ChatMessage
-					if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
-						log.Error().Err(err).Msg("gateway unmarshal failed")
+					var message db.Message
+					if err := json.Unmarshal([]byte(data), &message); err != nil {
+						log.Error().Err(err).Msg("gateway unmarshal message failed")
 						continue
 					}
-					g.deliverToClient(ctx, chatMsg.ReceiverID, &chatMsg)
+					receiverID := message.ReceiverID.String()
+					g.deliverToClient(ctx, receiverID, []byte(data))
 				}
 			}
 		}
 	}
 }
 
-func (g *Gateway) deliverToClient(ctx context.Context, userID string, msg *ChatMessage) {
+func (g *Gateway) deliverToClient(ctx context.Context, userID string, payload []byte) {
 	g.mu.RLock()
 	userConns := g.conns[userID]
 	clients := make([]*client, 0, len(userConns))
@@ -183,12 +175,6 @@ func (g *Gateway) deliverToClient(ctx context.Context, userID string, msg *ChatM
 	g.mu.RUnlock()
 
 	if len(clients) == 0 {
-		return
-	}
-
-	payload, err := json.Marshal(msg)
-	if err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal deliver message failed")
 		return
 	}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -19,7 +18,7 @@ var wg sync.WaitGroup
 
 func main() {
 	logger.InitLogger()
-	cfg := config.New(os.Getenv("CONFIG_PATH"))
+	cfg := config.New()
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,
@@ -32,11 +31,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		svc.Run(ctx)
-	}()
+	})
 
 	wg.Wait()
 	log.Info().Msg("worker stopped")
