@@ -2,38 +2,34 @@ package main
 
 import (
 	"context"
-	"errors"
-	"os"
-	"os/signal"
-	"syscall"
+	"log"
+	"net/http"
+	"sync"
 
-	"github.com/phuslu/log"
-
+	"github.com/sanbei101/im/internal/gateway"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/logger"
 )
 
+var wg sync.WaitGroup
+
 func main() {
 	logger.InitLogger()
+	config := config.New()
+	g := gateway.New(config)
+	ctx := context.Background()
 
-	cfgPath := os.Getenv("CONFIG_PATH")
-	app, cleanup, err := initializeGatewayApp(cfgPath)
-	if err != nil {
-		log.Fatal().Err(err).Str("config_path", configPathOrDefault(cfgPath)).Msg("initialize gateway app failed")
-	}
-	defer cleanup()
+	http.HandleFunc("/ws", g.HandleUserMessage)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	wg.Go(func() {
+		g.SubscribeFromWorker(ctx)
+	})
 
-	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		log.Fatal().Err(err).Msg("gateway stopped unexpectedly")
-	}
-}
+	wg.Go(func() {
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Fatal(err)
+		}
+	})
 
-func configPathOrDefault(path string) string {
-	if path != "" {
-		return path
-	}
-	return config.DefaultConfigPath
+	wg.Wait()
 }

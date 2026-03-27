@@ -3,30 +3,33 @@ package config
 import (
 	"errors"
 	"os"
-	"time"
 
+	"github.com/phuslu/log"
 	"gopkg.in/yaml.v3"
 )
 
 const DefaultConfigPath = "config.yaml"
 
-// Config 是整个项目的统一配置入口。
 type Config struct {
 	Gateway  GatewayConfig  `yaml:"gateway"`
 	Postgres PostgresConfig `yaml:"postgres"`
 	Redis    RedisConfig    `yaml:"redis"`
-	Worker   WorkerConfig   `yaml:"worker"`
+}
+
+func New(path ...string) *Config {
+	p := DefaultConfigPath
+	if len(path) > 0 {
+		p = path[0]
+	}
+	config, err := Load(p)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to load config")
+	}
+	return config
 }
 
 type GatewayConfig struct {
-	Addr              string        `yaml:"addr"`
-	GRPCAddr          string        `yaml:"grpc_addr"`
-	Path              string        `yaml:"path"`
-	HandshakeTimeout  time.Duration `yaml:"handshake_timeout"`
-	WriteTimeout      time.Duration `yaml:"write_timeout"`
-	ReadHeaderTimeout time.Duration `yaml:"read_header_timeout"`
-	ShutdownTimeout   time.Duration `yaml:"shutdown_timeout"`
-	SendQueueSize     int           `yaml:"send_queue_size"`
+	MaxTimeout int `yaml:"max_timeout"`
 }
 
 type RedisConfig struct {
@@ -39,62 +42,44 @@ type PostgresConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
-type WorkerConfig struct {
-	GRPCAddr string `yaml:"grpc_addr"`
-}
-
-// Load 从 yaml 文件加载配置，并补齐默认值。
 func Load(path string) (*Config, error) {
 	if path == "" {
 		path = DefaultConfigPath
 	}
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-
-	cfg := defaultConfig()
+	cfg := &Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	cfg.Default()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-// Validate 校验关键配置，避免服务启动后再暴露问题。
-func (c *Config) Validate() error {
-	if c.Gateway.Addr == "" {
-		return errors.New("config: gateway.addr is required")
+func (c *Config) Default() {
+	if c.Gateway.MaxTimeout == 0 {
+		c.Gateway.MaxTimeout = 10
 	}
-	if c.Gateway.GRPCAddr == "" {
-		return errors.New("config: gateway.grpc_addr is required")
-	}
-	if c.Worker.GRPCAddr == "" {
-		return errors.New("config: worker.grpc_addr is required")
-	}
-	return nil
 }
 
-func defaultConfig() *Config {
-	return &Config{
-		Gateway: GatewayConfig{
-			Addr:              ":8080",
-			GRPCAddr:          ":9090",
-			Path:              "/ws",
-			HandshakeTimeout:  10 * time.Second,
-			WriteTimeout:      5 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-			ShutdownTimeout:   10 * time.Second,
-			SendQueueSize:     64,
-		},
-		Redis: RedisConfig{
-			Addr: "127.0.0.1:6379",
-		},
-		Worker: WorkerConfig{
-			GRPCAddr: ":9091",
-		},
+// Validate 校验关键配置,避免服务启动后再暴露问题。
+func (c *Config) Validate() error {
+	if c.Postgres.DSN == "" {
+		return errors.New("postgres dsn is required")
 	}
+	if c.Redis.Addr == "" {
+		return errors.New("redis addr is required")
+	}
+	if c.Redis.DB < 0 {
+		return errors.ErrUnsupported
+	}
+	if c.Redis.Password == "" {
+		return errors.New("redis password is required")
+	}
+	return nil
 }
