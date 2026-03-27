@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
+	"os/signal"
 	"sync"
+	"syscall"
 
+	"github.com/phuslu/log"
 	"github.com/sanbei101/im/internal/gateway"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/logger"
@@ -17,7 +19,9 @@ func main() {
 	logger.InitLogger()
 	config := config.New()
 	g := gateway.New(config)
-	ctx := context.Background()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	http.HandleFunc("/ws", g.HandleUserMessage)
 
@@ -26,10 +30,12 @@ func main() {
 	})
 
 	wg.Go(func() {
-		if err := http.ListenAndServe(":8080", nil); err != nil {
-			log.Fatal(err)
+		if err := http.ListenAndServe(":8080", nil); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("failed to start HTTP server")
 		}
 	})
 
+	<-ctx.Done()
 	wg.Wait()
+	log.Info().Msg("gateway stopped")
 }

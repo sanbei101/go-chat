@@ -84,8 +84,8 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	for {
 		readCtx, readCancel := context.WithTimeout(r.Context(), time.Duration(g.config.Gateway.MaxTimeout)*time.Second)
 		_, payload, err := conn.Read(readCtx)
-		readCancel()
 		if err != nil {
+			readCancel()
 			if websocket.CloseStatus(err) == -1 {
 				log.Error().Err(err).Str("user_id", userID).Msg("gateway read message failed")
 			}
@@ -94,34 +94,42 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 
 		var message db.Message
 		if err := json.Unmarshal(payload, &message); err != nil {
+			readCancel()
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway unmarshal message failed")
-			w.Write([]byte("invalid message format"))
-			return
+			conn.Write(readCtx, websocket.MessageText, []byte("invalid message format"))
+			continue
 		}
 
 		if message.ClientMsgID == uuid.Nil {
+			readCancel()
 			log.Error().Str("user_id", userID).Msg("gateway missing client_msg_id")
-			w.Write([]byte("missing client_msg_id"))
-			return
+			conn.Write(readCtx, websocket.MessageText, []byte("missing client_msg_id"))
+			continue
 		}
 
 		message.MsgID, err = uuid.NewV7()
 		if err != nil {
+			readCancel()
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway generate msg_id failed")
-			w.Write([]byte("failed to generate msg_id"))
-			return
+			conn.Write(readCtx, websocket.MessageText, []byte("failed to generate msg_id"))
+			continue
 		}
 		message.ServerTime = time.Now().UnixMicro()
 		bin, err := json.Marshal(message)
 		if err != nil {
+			readCancel()
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
 			continue
 		}
 
-		err = g.redis.XAdd(readCtx, &redis.XAddArgs{
+		// 使用新的 context 而非已 canceled 的 readCtx
+		pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err = g.redis.XAdd(pubCtx, &redis.XAddArgs{
 			Stream: "messages:inbound",
 			Values: map[string]any{"data": string(bin)},
 		}).Err()
+		pubCancel()
+		readCancel()
 
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway push message to redis failed")
@@ -131,23 +139,33 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
+	// 使用 "0" 起始 ID 而非 "$"，确保不错过任何消息
+	streamID := "0"
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 			result, err := g.redis.XRead(ctx, &redis.XReadArgs{
-				Streams: []string{"messages:deliver", "$"},
+				Streams: []string{"messages:deliver", streamID},
 				Count:   10,
 				Block:   time.Second,
 			}).Result()
-			if err != nil && !errors.Is(err, redis.Nil) {
+			if err != nil {
+				if errors.Is(err, redis.Nil) {
+					continue
+				}
+				if ctx.Err() != nil {
+					return
+				}
 				log.Error().Err(err).Msg("gateway xread failed")
 				time.Sleep(time.Second)
 				continue
 			}
 			for _, stream := range result {
 				for _, msg := range stream.Messages {
+					// 更新 streamID 为下一条消息的起始位置
+					streamID = msg.ID
 					data, ok := msg.Values["data"].(string)
 					if !ok {
 						continue
