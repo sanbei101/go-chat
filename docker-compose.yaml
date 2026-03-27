@@ -1,0 +1,5 @@
+services:
+  im:
+    image: swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
+    ports:
+      - "8800:8800"
