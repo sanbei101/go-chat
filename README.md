@@ -2,12 +2,8 @@
 
 ## 🤖 给 AI 的指令说明
 你现在是一个资深的 Go 语言后端架构师。本项目的目标是使用 Go 语言从零开发一个高性能、分布式的即时通讯(IM)系统。
-请仔细阅读以下架构设计、技术栈和任务拆解。在接下来的对话中,请严格按照本规范输出代码,遵循高内聚低耦合的设计原则,并确保代码包含详尽的中文注释。
-## wire 依赖注入
-本项目使用wire进行依赖注入,ai不可以自己生成wire_gen.go,而是应该使用`wire`命令生成
 
 ## 🏗️ 架构设计
-
 本项目采用拆分架构,共包含三个核心独立模块,统一放在一个代码仓库中:(见cmd/目录)
 
 1.  **消息网关模块 (Gateway - `cmd/gateway`)**
@@ -24,6 +20,8 @@
     * **职责**:处理所有非实时的短连接请求。
     * **功能**:基于 Gin 框架开发。负责用户注册登录、好友关系管理、群组管理、历史消息拉取、离线消息同步等 RESTful 接口。
 
+4. **数据库层 (db/)**:使用 sqlc 生成类型安全的数据库访问代码,负责与 PostgreSQL 的交互,请勿修改sqlc 生成的代码(`internal/db`目录,一定是修改`db`目录下的sql文件,再使用`sqlc generate`命令生成代码)
+
 ## 🛠️ 技术栈选型
 
 * **语言**:Go 1.26
@@ -37,16 +35,7 @@
 
 ## 📂 项目结构规范
 
-请严格遵循标准的 Go Project Layout,所有公用工具放入 `pkg/`,业务代码按模块分装在 `internal/` 下,程序入口位于 `cmd/{module}/main.go`。协议定义(Protocol)需要在 `pkg/protocol` 中统一定义,确保各模块使用相同的数据结构通信
-
-### protobuf 生成
-进入`pkg/protocol`目录,执行以下命令生成 Go 代码:
-```fish
-# 首先buf格式化
-buf format -w .
-# 然后生成Go代码
-protoc --go_out=. *.proto
-```
+请严格遵循标准的 Go Project Layout,所有公用工具放入 `pkg/`,业务代码按模块分装在 `internal/` 下,程序入口位于 `cmd/{module}/main.go`
 
 ## 代码逻辑
 1.前端发送消息(JSON 格式)
@@ -67,7 +56,7 @@ protoc --go_out=. *.proto
 ```
 
 2. 网关接收消息
-职责:接收 JSON -> 补全核心参数(msg_id,server_time) -> 转成 Protobuf 二进制 -> 丢进 Redis Stream
+职责:接收 JSON -> 补全核心参数(msg_id,server_time) -> 丢进 Redis Stream
 
 3. 工作线程处理消息
 职责:从 Redis Stream 拉取消息 -> 持久化到 PostgreSQL -> 生成投递指令 -> 丢回 Redis Stream

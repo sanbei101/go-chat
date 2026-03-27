@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
@@ -10,14 +11,24 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/phuslu/log"
-	"google.golang.org/protobuf/encoding/protojson"
-	gproto "google.golang.org/protobuf/proto"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/jwt"
-	proto "github.com/sanbei101/im/pkg/protocol"
 )
+
+// ChatMessage 是 gateway 与 worker 之间通过 Redis 传递的消息格式。
+type ChatMessage struct {
+	MsgID       string            `json:"msg_id"`
+	ClientMsgID string            `json:"client_msg_id"`
+	SenderID    string            `json:"sender_id"`
+	ReceiverID  string            `json:"receiver_id"`
+	ChatType    string            `json:"chat_type"` // "single" or "group"
+	ServerTime  int64             `json:"server_time"`
+	ReplyToMsgID string           `json:"reply_to_msg_id"`
+	Payload     json.RawMessage   `json:"payload"`
+	Ext         map[string]string `json:"ext"`
+}
 
 type Gateway struct {
 	mu     sync.RWMutex
@@ -93,37 +104,33 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		req := &proto.SendMessageRequest{}
-		msg := req.GetMessage()
-		if err := protojson.Unmarshal(payload, req); err != nil || msg == nil {
-			msg = &proto.ChatMessage{}
-			if err := protojson.Unmarshal(payload, msg); err != nil {
-				log.Warn().Err(err).Str("user_id", userID).Msg("gateway decode message failed")
-				continue
-			}
+		var msg ChatMessage
+		if err := json.Unmarshal(payload, &msg); err != nil {
+			log.Warn().Err(err).Str("user_id", userID).Msg("gateway decode message failed")
+			continue
 		}
 
-		msg.SenderId = userID
-		if msg.MsgId == "" {
+		msg.SenderID = userID
+		if msg.MsgID == "" {
 			id, err := uuid.NewV7()
 			if err != nil {
 				log.Error().Err(err).Str("user_id", userID).Msg("gateway generate msg id failed")
 				continue
 			}
-			msg.MsgId = id.String()
+			msg.MsgID = id.String()
 		}
 		if msg.ServerTime == 0 {
 			msg.ServerTime = time.Now().UnixNano()
 		}
 
-		bin, err := gproto.Marshal(msg)
+		bin, err := json.Marshal(msg)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
 			continue
 		}
 		err = g.redis.XAdd(readCtx, &redis.XAddArgs{
 			Stream: "messages:inbound",
-			Values: bin,
+			Values: map[string]any{"data": string(bin)},
 		}).Err()
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway push message to redis failed")
@@ -150,19 +157,23 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 			}
 			for _, stream := range result {
 				for _, msg := range stream.Messages {
-					var chatMsg proto.ChatMessage
-					if err := gproto.Unmarshal([]byte(msg.Values["data"].(string)), &chatMsg); err != nil {
+					data, ok := msg.Values["data"].(string)
+					if !ok {
+						continue
+					}
+					var chatMsg ChatMessage
+					if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
 						log.Error().Err(err).Msg("gateway unmarshal failed")
 						continue
 					}
-					g.deliverToClient(ctx, chatMsg.GetReceiverId(), &chatMsg)
+					g.deliverToClient(ctx, chatMsg.ReceiverID, &chatMsg)
 				}
 			}
 		}
 	}
 }
 
-func (g *Gateway) deliverToClient(ctx context.Context, userID string, msg *proto.ChatMessage) {
+func (g *Gateway) deliverToClient(ctx context.Context, userID string, msg *ChatMessage) {
 	g.mu.RLock()
 	userConns := g.conns[userID]
 	clients := make([]*client, 0, len(userConns))
@@ -175,7 +186,7 @@ func (g *Gateway) deliverToClient(ctx context.Context, userID string, msg *proto
 		return
 	}
 
-	payload, err := protojson.Marshal(msg)
+	payload, err := json.Marshal(msg)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal deliver message failed")
 		return

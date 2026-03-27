@@ -7,8 +7,9 @@ package db
 import (
 	"database/sql/driver"
 	"fmt"
+	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 type ChatType string
@@ -16,7 +17,6 @@ type ChatType string
 const (
 	ChatTypeSingle ChatType = "single"
 	ChatTypeGroup  ChatType = "group"
-	ChatTypeRoom   ChatType = "room"
 )
 
 func (e *ChatType) Scan(src interface{}) error {
@@ -54,15 +54,60 @@ func (ns NullChatType) Value() (driver.Value, error) {
 	return string(ns.ChatType), nil
 }
 
+type MessageType string
+
+const (
+	MessageTypeText  MessageType = "text"
+	MessageTypeImage MessageType = "image"
+	MessageTypeVideo MessageType = "video"
+	MessageTypeFile  MessageType = "file"
+)
+
+func (e *MessageType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MessageType(s)
+	case string:
+		*e = MessageType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MessageType: %T", src)
+	}
+	return nil
+}
+
+type NullMessageType struct {
+	MessageType MessageType `json:"message_type"`
+	Valid       bool        `json:"valid"` // Valid is true if MessageType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMessageType) Scan(value interface{}) error {
+	if value == nil {
+		ns.MessageType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MessageType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMessageType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MessageType), nil
+}
+
 type Message struct {
-	MsgID        string             `json:"msg_id"`
-	ClientMsgID  string             `json:"client_msg_id"`
-	SenderID     string             `json:"sender_id"`
-	ReceiverID   string             `json:"receiver_id"`
-	ChatType     ChatType           `json:"chat_type"`
-	ServerTime   int64              `json:"server_time"`
-	ReplyToMsgID string             `json:"reply_to_msg_id"`
-	Payload      []byte             `json:"payload"`
-	Ext          []byte             `json:"ext"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	MsgID        uuid.UUID   `json:"msg_id"`
+	ClientMsgID  uuid.UUID   `json:"client_msg_id"`
+	SenderID     uuid.UUID   `json:"sender_id"`
+	ReceiverID   uuid.UUID   `json:"receiver_id"`
+	ChatType     ChatType    `json:"chat_type"`
+	ServerTime   int64       `json:"server_time"`
+	ReplyToMsgID *uuid.UUID  `json:"reply_to_msg_id"`
+	MsgType      MessageType `json:"msg_type"`
+	Payload      []byte      `json:"payload"`
+	Ext          []byte      `json:"ext"`
+	CreatedAt    time.Time   `json:"created_at"`
 }

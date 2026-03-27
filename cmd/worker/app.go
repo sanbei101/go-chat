@@ -2,74 +2,167 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"net"
-	"sync"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phuslu/log"
-	"google.golang.org/grpc"
+	"github.com/redis/go-redis/v9"
 
-	"github.com/sanbei101/im/internal/worker"
+	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/pkg/config"
-	proto "github.com/sanbei101/im/pkg/protocol"
 )
 
-type App struct {
-	Config       *config.Config
-	Worker       *worker.Service
-	GRPCServer   *grpc.Server
-	GRPCListener net.Listener
+// ChatMessage matches the JSON format used in Redis streams.
+type ChatMessage struct {
+	MsgID       string          `json:"msg_id"`
+	ClientMsgID string          `json:"client_msg_id"`
+	SenderID    string          `json:"sender_id"`
+	ReceiverID  string          `json:"receiver_id"`
+	ChatType    string          `json:"chat_type"`
+	ServerTime  int64           `json:"server_time"`
+	ReplyToMsgID string         `json:"reply_to_msg_id"`
+	Payload     json.RawMessage `json:"payload"`
+	Ext         map[string]string `json:"ext"`
 }
 
-func (a *App) Run(ctx context.Context) error {
-	errCh := make(chan error, 1)
-	var wg sync.WaitGroup
+type App struct {
+	cfg     *config.Config
+	redis   *redis.Client
+	queries *db.Queries
+	pool    *pgxpool.Pool
+}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log.Info().
-			Str("grpc_addr", a.Config.Worker.GRPCAddr).
-			Msg("worker grpc server started")
+func NewApp(cfg *config.Config, redis *redis.Client) *App {
+	pool, err := pgxpool.New(context.Background(), cfg.Postgres.DSN)
+	if err != nil {
+		log.Fatal().Err(err).Msg("worker connect postgres failed")
+	}
+	if err := pool.Ping(context.Background()); err != nil {
+		log.Fatal().Err(err).Msg("worker ping postgres failed")
+	}
+	return &App{
+		cfg:     cfg,
+		redis:   redis,
+		queries: db.New(pool),
+		pool:    pool,
+	}
+}
 
-		if err := a.GRPCServer.Serve(a.GRPCListener); err != nil {
-			errCh <- err
+func (a *App) Run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			a.pool.Close()
+			return
+		default:
+			a.processInbound(ctx)
 		}
-	}()
+	}
+}
 
-	go func() {
-		<-ctx.Done()
-		a.GRPCServer.GracefulStop()
-	}()
+func (a *App) processInbound(ctx context.Context) {
+	result, err := a.redis.XRead(ctx, &redis.XReadArgs{
+		Streams: []string{"messages:inbound", "$"},
+		Count:   10,
+		Block:   time.Second,
+	}).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		log.Error().Err(err).Msg("worker xread failed")
+		time.Sleep(time.Second)
+		return
+	}
+	if len(result) == 0 {
+		return
+	}
 
-	select {
-	case <-ctx.Done():
-		wg.Wait()
-		return ctx.Err()
-	case err := <-errCh:
-		if errors.Is(err, grpc.ErrServerStopped) {
-			wg.Wait()
-			return ctx.Err()
+	for _, stream := range result {
+		for _, msg := range stream.Messages {
+			data, ok := msg.Values["data"].(string)
+			if !ok {
+				continue
+			}
+			var chatMsg ChatMessage
+			if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
+				log.Error().Err(err).Msg("worker unmarshal failed")
+				continue
+			}
+
+			if err := a.persist(ctx, &chatMsg); err != nil {
+				log.Error().Err(err).Str("msg_id", chatMsg.MsgID).Msg("worker persist failed")
+				continue
+			}
+
+			if err := a.publishDeliver(ctx, &chatMsg); err != nil {
+				log.Error().Err(err).Str("msg_id", chatMsg.MsgID).Msg("worker publish deliver failed")
+			}
 		}
+	}
+}
+
+func (a *App) persist(ctx context.Context, msg *ChatMessage) error {
+	if msg.MsgID == "" {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
+		msg.MsgID = id.String()
+	}
+	if msg.ServerTime == 0 {
+		msg.ServerTime = time.Now().UnixNano()
+	}
+
+	msgUUID, err := uuid.Parse(msg.MsgID)
+	if err != nil {
 		return err
 	}
-}
 
-type WorkerGRPCServer struct {
-	proto.UnimplementedWorkerServiceServer
-	worker *worker.Service
-}
-
-func (s *WorkerGRPCServer) SendMessage(ctx context.Context, req *proto.SendMessageRequest) (*proto.SendMessageResponse, error) {
-	if req == nil || req.Message == nil {
-		return &proto.SendMessageResponse{}, nil
+	var clientUUID uuid.UUID
+	if msg.ClientMsgID != "" {
+		clientUUID, _ = uuid.Parse(msg.ClientMsgID)
 	}
 
-	delivery, err := s.worker.Process(ctx, &worker.InboundEnvelope{
-		Message: req.Message,
+	var senderUUID, receiverUUID uuid.UUID
+	senderUUID, _ = uuid.Parse(msg.SenderID)
+	receiverUUID, _ = uuid.Parse(msg.ReceiverID)
+
+	var replyToUUID *uuid.UUID
+	if msg.ReplyToMsgID != "" {
+		u, _ := uuid.Parse(msg.ReplyToMsgID)
+		replyToUUID = &u
+	}
+
+	ext, _ := json.Marshal(msg.Ext)
+
+	return a.queries.CreateMessage(ctx, db.CreateMessageParams{
+		MsgID:        msgUUID,
+		ClientMsgID:  clientUUID,
+		SenderID:     senderUUID,
+		ReceiverID:   receiverUUID,
+		ChatType:     toDBChatType(msg.ChatType),
+		ServerTime:   msg.ServerTime,
+		ReplyToMsgID: replyToUUID,
+		Payload:      msg.Payload,
+		Ext:          ext,
 	})
+}
+
+func (a *App) publishDeliver(ctx context.Context, msg *ChatMessage) error {
+	bin, err := json.Marshal(msg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &proto.SendMessageResponse{Message: delivery.Message}, nil
+	return a.redis.XAdd(ctx, &redis.XAddArgs{
+		Stream: "messages:deliver",
+		Values: map[string]any{"data": string(bin)},
+	}).Err()
+}
+
+func toDBChatType(t string) db.ChatType {
+	if t == "group" {
+		return db.ChatTypeGroup
+	}
+	return db.ChatTypeSingle
 }

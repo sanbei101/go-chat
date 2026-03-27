@@ -2,38 +2,42 @@ package main
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/phuslu/log"
+	"github.com/redis/go-redis/v9"
 
+	"github.com/sanbei101/im/internal/worker"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/logger"
 )
 
+var wg sync.WaitGroup
+
 func main() {
 	logger.InitLogger()
+	cfg := config.New(os.Getenv("CONFIG_PATH"))
 
-	cfgPath := os.Getenv("CONFIG_PATH")
-	app, cleanup, err := initializeWorkerApp(cfgPath)
-	if err != nil {
-		log.Fatal().Err(err).Str("config_path", configPathOrDefault(cfgPath)).Msg("initialize worker app failed")
-	}
-	defer cleanup()
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+
+	svc := worker.New(cfg, redisClient)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		log.Fatal().Err(err).Msg("worker stopped unexpectedly")
-	}
-}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		svc.Run(ctx)
+	}()
 
-func configPathOrDefault(path string) string {
-	if path != "" {
-		return path
-	}
-	return config.DefaultConfigPath
+	wg.Wait()
+	log.Info().Msg("worker stopped")
 }

@@ -1,19 +1,26 @@
 CREATE TYPE chat_type AS ENUM (
     'single',
-    'group',
-    'room'
+    'group'
+);
+
+CREATE TYPE message_type AS ENUM (
+    'text',
+    'image',
+    'video',
+    'file'
 );
 
 CREATE TABLE messages (
-    msg_id TEXT PRIMARY KEY,
-    client_msg_id TEXT NOT NULL DEFAULT '',
-    sender_id TEXT NOT NULL,
-    receiver_id TEXT NOT NULL,
+    msg_id uuid PRIMARY KEY,
+    client_msg_id uuid NOT NULL,
+    sender_id uuid NOT NULL,
+    receiver_id uuid NOT NULL,
     chat_type chat_type NOT NULL,
     server_time BIGINT NOT NULL,
-    reply_to_msg_id TEXT NOT NULL DEFAULT '',
+    reply_to_msg_id uuid DEFAULT NULL,
+    msg_type message_type NOT NULL,
     payload JSONB NOT NULL,
-    ext JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ext JSONB DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

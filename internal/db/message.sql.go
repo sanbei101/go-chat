@@ -7,6 +7,9 @@ package db
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const createMessage = `-- name: CreateMessage :exec
@@ -34,15 +37,15 @@ INSERT INTO messages (
 `
 
 type CreateMessageParams struct {
-	MsgID        string   `json:"msg_id"`
-	ClientMsgID  string   `json:"client_msg_id"`
-	SenderID     string   `json:"sender_id"`
-	ReceiverID   string   `json:"receiver_id"`
-	ChatType     ChatType `json:"chat_type"`
-	ServerTime   int64    `json:"server_time"`
-	ReplyToMsgID string   `json:"reply_to_msg_id"`
-	Payload      []byte   `json:"payload"`
-	Ext          []byte   `json:"ext"`
+	MsgID        uuid.UUID  `json:"msg_id"`
+	ClientMsgID  uuid.UUID  `json:"client_msg_id"`
+	SenderID     uuid.UUID  `json:"sender_id"`
+	ReceiverID   uuid.UUID  `json:"receiver_id"`
+	ChatType     ChatType   `json:"chat_type"`
+	ServerTime   int64      `json:"server_time"`
+	ReplyToMsgID *uuid.UUID `json:"reply_to_msg_id"`
+	Payload      []byte     `json:"payload"`
+	Ext          []byte     `json:"ext"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
@@ -77,9 +80,22 @@ WHERE msg_id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetMessageByID(ctx context.Context, msgID string) (*Message, error) {
+type GetMessageByIDRow struct {
+	MsgID        uuid.UUID  `json:"msg_id"`
+	ClientMsgID  uuid.UUID  `json:"client_msg_id"`
+	SenderID     uuid.UUID  `json:"sender_id"`
+	ReceiverID   uuid.UUID  `json:"receiver_id"`
+	ChatType     ChatType   `json:"chat_type"`
+	ServerTime   int64      `json:"server_time"`
+	ReplyToMsgID *uuid.UUID `json:"reply_to_msg_id"`
+	Payload      []byte     `json:"payload"`
+	Ext          []byte     `json:"ext"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+func (q *Queries) GetMessageByID(ctx context.Context, msgID uuid.UUID) (*GetMessageByIDRow, error) {
 	row := q.db.QueryRow(ctx, getMessageByID, msgID)
-	var i Message
+	var i GetMessageByIDRow
 	err := row.Scan(
 		&i.MsgID,
 		&i.ClientMsgID,
@@ -116,13 +132,26 @@ LIMIT $4
 `
 
 type ListMessagesByConversationParams struct {
-	ReceiverID       string   `json:"receiver_id"`
-	ChatType         ChatType `json:"chat_type"`
-	BeforeServerTime int64    `json:"before_server_time"`
-	PageSize         int32    `json:"page_size"`
+	ReceiverID       uuid.UUID `json:"receiver_id"`
+	ChatType         ChatType  `json:"chat_type"`
+	BeforeServerTime int64     `json:"before_server_time"`
+	PageSize         int32     `json:"page_size"`
 }
 
-func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]*Message, error) {
+type ListMessagesByConversationRow struct {
+	MsgID        uuid.UUID  `json:"msg_id"`
+	ClientMsgID  uuid.UUID  `json:"client_msg_id"`
+	SenderID     uuid.UUID  `json:"sender_id"`
+	ReceiverID   uuid.UUID  `json:"receiver_id"`
+	ChatType     ChatType   `json:"chat_type"`
+	ServerTime   int64      `json:"server_time"`
+	ReplyToMsgID *uuid.UUID `json:"reply_to_msg_id"`
+	Payload      []byte     `json:"payload"`
+	Ext          []byte     `json:"ext"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]*ListMessagesByConversationRow, error) {
 	rows, err := q.db.Query(ctx, listMessagesByConversation,
 		arg.ReceiverID,
 		arg.ChatType,
@@ -133,9 +162,9 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessag
 		return nil, err
 	}
 	defer rows.Close()
-	items := []*Message{}
+	items := []*ListMessagesByConversationRow{}
 	for rows.Next() {
-		var i Message
+		var i ListMessagesByConversationRow
 		if err := rows.Scan(
 			&i.MsgID,
 			&i.ClientMsgID,
