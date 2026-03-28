@@ -218,18 +218,9 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 
 func (g *Gateway) deliverToClient(userID string, payload []byte) {
 	g.mu.RLock()
-	userConns := g.conns[userID]
-	clients := make([]*client, 0, len(userConns))
-	for c := range userConns {
-		clients = append(clients, c)
-	}
-	g.mu.RUnlock()
+	defer g.mu.RUnlock()
 
-	if len(clients) == 0 {
-		return
-	}
-
-	for _, c := range clients {
+	for c := range g.conns[userID] {
 		select {
 		case c.send <- payload:
 		default:
