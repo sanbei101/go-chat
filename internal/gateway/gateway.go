@@ -32,7 +32,15 @@ type Gateway struct {
 
 type client struct {
 	conn *websocket.Conn
-	mu   sync.Mutex
+	send chan []byte
+}
+
+func (c *client) writePump(ctx context.Context) {
+	for msg := range c.send {
+		if err := c.conn.Write(ctx, websocket.MessageText, msg); err != nil {
+			return
+		}
+	}
 }
 
 func New(config *config.Config) *Gateway {
@@ -70,13 +78,17 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	c := &client{conn: conn}
+	c := &client{
+		conn: conn,
+		send: make(chan []byte, 100),
+	}
 	g.mu.Lock()
 	if g.conns[userID] == nil {
 		g.conns[userID] = map[*client]struct{}{}
 	}
 	g.conns[userID][c] = struct{}{}
 	g.mu.Unlock()
+
 	defer func() {
 		g.mu.Lock()
 		delete(g.conns[userID], c)
@@ -84,7 +96,10 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 			delete(g.conns, userID)
 		}
 		g.mu.Unlock()
+		close(c.send)
 	}()
+
+	go c.writePump(context.Background())
 
 	for {
 		_, payload, err := conn.Read(r.Context())
@@ -98,20 +113,29 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 		var message db.Message
 		if err := json.Unmarshal(payload, &message); err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway unmarshal message failed")
-			conn.Write(r.Context(), websocket.MessageText, []byte("invalid message format"))
+			select {
+			case c.send <- []byte("invalid message format"):
+			default:
+			}
 			continue
 		}
 
 		if message.ClientMsgID == uuid.Nil {
 			log.Error().Str("user_id", userID).Msg("gateway missing client_msg_id")
-			conn.Write(r.Context(), websocket.MessageText, []byte("missing client_msg_id"))
+			select {
+			case c.send <- []byte("missing client_msg_id"):
+			default:
+			}
 			continue
 		}
 
 		message.MsgID, err = uuid.NewV7()
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway generate msg_id failed")
-			conn.Write(r.Context(), websocket.MessageText, []byte("failed to generate msg_id"))
+			select {
+			case c.send <- []byte("failed to generate msg_id"):
+			default:
+			}
 			continue
 		}
 		message.ServerTime = time.Now().UnixMicro()
@@ -182,7 +206,7 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 						continue
 					}
 					receiverID := message.ReceiverID.String()
-					g.deliverToClient(ctx, receiverID, []byte(data))
+					g.deliverToClient(receiverID, []byte(data))
 				}
 				if len(msgIDs) > 0 {
 					g.redis.XAck(ctx, "messages:deliver", "gateway_group", msgIDs...)
@@ -192,7 +216,7 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 	}
 }
 
-func (g *Gateway) deliverToClient(ctx context.Context, userID string, payload []byte) {
+func (g *Gateway) deliverToClient(userID string, payload []byte) {
 	g.mu.RLock()
 	userConns := g.conns[userID]
 	clients := make([]*client, 0, len(userConns))
@@ -206,11 +230,10 @@ func (g *Gateway) deliverToClient(ctx context.Context, userID string, payload []
 	}
 
 	for _, c := range clients {
-		c.mu.Lock()
-		err := c.conn.Write(ctx, websocket.MessageText, payload)
-		c.mu.Unlock()
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Msg("gateway write to client failed")
+		select {
+		case c.send <- payload:
+		default:
+			log.Warn().Str("user_id", userID).Msg("gateway client buffer full, dropping message")
 		}
 	}
 }
