@@ -121,9 +121,8 @@ func (s *Service) processInbound(ctx context.Context) {
 			}
 			if err := s.publishDeliverBatch(ctx, msgs); err != nil {
 				log.Error().Err(err).Msg("worker publish deliver batch failed")
+				continue
 			}
-		}
-		if len(msgIDs) > 0 {
 			s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
 		}
 	}
