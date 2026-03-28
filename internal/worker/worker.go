@@ -36,6 +36,10 @@ func New(cfg *config.Config, redisClient *redis.Client) *Service {
 }
 
 func (s *Service) Run(ctx context.Context) {
+	err := s.redis.XGroupCreateMkStream(ctx, "messages:inbound", "worker_group", "0").Err()
+	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+		log.Warn().Err(err).Msg("worker consume group messages:inbound exist")
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -48,11 +52,13 @@ func (s *Service) Run(ctx context.Context) {
 }
 
 func (s *Service) processInbound(ctx context.Context) {
-	streamID := "$"
-	result, err := s.redis.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{"messages:inbound", streamID},
-		Count:   10,
-		Block:   time.Second,
+	result, err := s.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
+		Group:    "worker_group",
+		Consumer: "worker1",
+		Streams:  []string{"messages:inbound", ">"},
+		Count:    100,
+		Block:    time.Second,
+		NoAck:    false,
 	}).Result()
 	if err != nil {
 		switch {
@@ -67,8 +73,12 @@ func (s *Service) processInbound(ctx context.Context) {
 	}
 
 	for _, stream := range result {
+		var msgs []*db.Message
+		var params []db.BatchCreateMessagesParams
+		var msgIDs []string
+
 		for _, msg := range stream.Messages {
-			streamID = msg.ID
+			msgIDs = append(msgIDs, msg.ID)
 			data, ok := msg.Values["data"].(string)
 			if !ok {
 				continue
@@ -78,44 +88,63 @@ func (s *Service) processInbound(ctx context.Context) {
 				log.Error().Err(err).Msg("worker unmarshal failed")
 				continue
 			}
+			msgs = append(msgs, &chatMsg)
+			params = append(params, db.BatchCreateMessagesParams{
+				MsgID:        chatMsg.MsgID,
+				ClientMsgID:  chatMsg.ClientMsgID,
+				SenderID:     chatMsg.SenderID,
+				ReceiverID:   chatMsg.ReceiverID,
+				ChatType:     chatMsg.ChatType,
+				MsgType:      chatMsg.MsgType,
+				ServerTime:   chatMsg.ServerTime,
+				ReplyToMsgID: chatMsg.ReplyToMsgID,
+				Payload:      chatMsg.Payload,
+				Ext:          chatMsg.Ext,
+			})
+		}
 
-			if err := s.persist(ctx, &chatMsg); err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
+		if len(params) > 0 {
+			batchResult := s.queries.BatchCreateMessages(ctx, params)
+			var batchErr error
+			batchResult.Exec(func(i int, err error) {
+				if err != nil {
+					batchErr = err
+					log.Error().Err(err).Msg("worker batch insert error")
 				}
-				log.Error().Err(err).Str("msg_id", chatMsg.MsgID.String()).Msg("worker persist failed")
+			})
+			if err := batchResult.Close(); err != nil {
+				log.Error().Err(err).Msg("worker batch close error")
+			}
+			if batchErr != nil {
+				log.Error().Err(batchErr).Msg("worker batch insert failed")
 				continue
 			}
-
-			if err := s.publishDeliver(ctx, &chatMsg); err != nil {
-				log.Error().Err(err).Str("msg_id", chatMsg.MsgID.String()).Msg("worker publish deliver failed")
+			if err := s.publishDeliverBatch(ctx, msgs); err != nil {
+				log.Error().Err(err).Msg("worker publish deliver batch failed")
 			}
+		}
+		if len(msgIDs) > 0 {
+			s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
 		}
 	}
 }
 
-func (s *Service) persist(ctx context.Context, msg *db.Message) error {
-	return s.queries.CreateMessage(ctx, db.CreateMessageParams{
-		MsgID:        msg.MsgID,
-		ClientMsgID:  msg.ClientMsgID,
-		SenderID:     msg.SenderID,
-		ReceiverID:   msg.ReceiverID,
-		ChatType:     msg.ChatType,
-		MsgType:      msg.MsgType,
-		ServerTime:   msg.ServerTime,
-		ReplyToMsgID: msg.ReplyToMsgID,
-		Payload:      msg.Payload,
-		Ext:          msg.Ext,
-	})
-}
-
-func (s *Service) publishDeliver(ctx context.Context, msg *db.Message) error {
-	bin, err := json.Marshal(msg)
-	if err != nil {
-		return err
+func (s *Service) publishDeliverBatch(ctx context.Context, msgs []*db.Message) error {
+	if len(msgs) == 0 {
+		return nil
 	}
-	return s.redis.XAdd(ctx, &redis.XAddArgs{
-		Stream: "messages:deliver",
-		Values: map[string]any{"data": string(bin)},
-	}).Err()
+	pipe := s.redis.Pipeline()
+	for _, msg := range msgs {
+		bin, err := json.Marshal(msg)
+		if err != nil {
+			log.Error().Err(err).Msg("worker marshal failed in publishDeliverBatch")
+			continue
+		}
+		pipe.XAdd(ctx, &redis.XAddArgs{
+			Stream: "messages:deliver",
+			Values: map[string]any{"data": string(bin)},
+		})
+	}
+	_, err := pipe.Exec(ctx)
+	return err
 }

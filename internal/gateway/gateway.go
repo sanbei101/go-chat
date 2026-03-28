@@ -18,6 +18,11 @@ import (
 	"github.com/sanbei101/im/pkg/jwt"
 )
 
+const (
+	StreamConsumeFromBeginning = "0"
+	StreamConsumeFromNewOnly   = "$"
+)
+
 type Gateway struct {
 	mu     sync.RWMutex
 	conns  map[string]map[*client]struct{}
@@ -130,16 +135,27 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
-	streamID := "0"
+	err := g.redis.XGroupCreateMkStream(ctx,
+		"messages:deliver",
+		"gateway_group",
+		StreamConsumeFromBeginning,
+	).Err()
+	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+		log.Warn().Err(err).Msg("gateway consumer group mkstream failed")
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			result, err := g.redis.XRead(ctx, &redis.XReadArgs{
-				Streams: []string{"messages:deliver", streamID},
-				Count:   10,
-				Block:   time.Second,
+			result, err := g.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
+				Group:    "gateway_group",
+				Consumer: "gateway1",
+				Streams:  []string{"messages:deliver", ">"},
+				Count:    10,
+				Block:    time.Second,
+				NoAck:    false,
 			}).Result()
 			if err != nil {
 				if errors.Is(err, redis.Nil) {
@@ -153,8 +169,9 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 				continue
 			}
 			for _, stream := range result {
+				var msgIDs []string
 				for _, msg := range stream.Messages {
-					streamID = msg.ID
+					msgIDs = append(msgIDs, msg.ID)
 					data, ok := msg.Values["data"].(string)
 					if !ok {
 						continue
@@ -166,6 +183,9 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 					}
 					receiverID := message.ReceiverID.String()
 					g.deliverToClient(ctx, receiverID, []byte(data))
+				}
+				if len(msgIDs) > 0 {
+					g.redis.XAck(ctx, "messages:deliver", "gateway_group", msgIDs...)
 				}
 			}
 		}
