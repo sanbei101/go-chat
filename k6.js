@@ -12,12 +12,14 @@ const REQ_HEADERS = {
 };
 
 const message = {
-  "client_msg_id": "018e4c50-84a2-7f55-9f1b-2c3d4e5f6a7b",
-  "receiver_id": "527049f5-7af5-41a8-bdf3-271d268d344b",
-  "chat_type": "single",
-  "msg_type": "text",
-  "payload": "{\"text\": \"你好\"}",
-  "ext": "{}"
+  client_msg_id: "018e4c50-84a2-7f55-9f1b-2c3d4e5f6a7b",
+  receiver_id: "527049f5-7af5-41a8-bdf3-271d268d344b",
+  chat_type: "single",
+  msg_type: "text",
+  payload: {
+    text: "你好",
+  },
+  ext: {},
 };
 const TEST_MESSAGE = JSON.stringify(message);
 
