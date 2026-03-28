@@ -142,6 +142,8 @@ func (s *Service) publishDeliverBatch(ctx context.Context, msgs []*db.Message) e
 		}
 		pipe.XAdd(ctx, &redis.XAddArgs{
 			Stream: "messages:deliver",
+			MaxLen: 100000,
+			Approx: true,
 			Values: map[string]any{"data": string(bin)},
 		})
 	}

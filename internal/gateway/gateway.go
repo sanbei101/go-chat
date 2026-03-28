@@ -148,6 +148,8 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 
 		err = g.redis.XAdd(context.Background(), &redis.XAddArgs{
 			Stream: "messages:inbound",
+			MaxLen: 100000,
+			Approx: true,
 			Values: map[string]any{"data": string(bin)},
 		}).Err()
 
