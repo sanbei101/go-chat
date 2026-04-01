@@ -43,12 +43,12 @@ func main() {
 	r := api.SetupRouter(userHandler)
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":8801",
 		Handler: r,
 	}
 
 	go func() {
-		log.Info().Msg("starting API server on :8080")
+		log.Info().Msg("starting API server on :8801")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("failed to start server")
 		}

@@ -1,38 +1,63 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
-
+import http from 'k6/http';
 export const options = {
   vus: 5,
   duration: '30s',
 };
 
-const WS_URL = 'ws://154.8.213.38:8800/ws';
-const REQ_HEADERS = {
-  'Authorization': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNTI3MDQ5ZjUtN2FmNS00MWE4LWJkZjMtMjcxZDI2OGQzNDRiIiwiZXhwIjoxNzc1MTk3MTYzLCJpYXQiOjE3NzQ1OTIzNjN9.ID7MkHzqshrXEDWXtUjEUYOMHE8EBbv93HyFwwnmT6I',
-};
 
-const message = {
-  client_msg_id: "018e4c50-84a2-7f55-9f1b-2c3d4e5f6a7b",
-  receiver_id: "527049f5-7af5-41a8-bdf3-271d268d344b",
-  chat_type: "single",
-  msg_type: "text",
-  payload: {
-    text: "你好",
-  },
-  ext: {},
-};
-const TEST_MESSAGE = JSON.stringify(message);
+export function setup() {
+  const payload = JSON.stringify({
+    count: 50
+  });
+  const apiUrl = 'http://154.8.213.38:8801/api/v1/users/batch'; 
+  const res = http.post(apiUrl, payload);
 
-export default function () {
+  const users = res.json('users');
+
+  if (!users || users.length < 50) {
+    throw new Error(`获取用户数据失败,仅获取到 ${users ? users.length : 0} 条数据。`);
+  }
+  return users; 
+}
+
+export default function (users) {
+  const vuIndex = __VU - 1;
+  
+  const me = users[vuIndex];
+
+  const isEven = (vuIndex % 2 === 0);
+  const partnerIndex = isEven ? vuIndex + 1 : vuIndex - 1;
+  const partner = users[partnerIndex];
+
+  const WS_URL = 'ws://154.8.213.38:8800/ws';
+  
+  const REQ_HEADERS = {
+    'Authorization': me.token, 
+  };
+
   let sendCount = 0;
 
   const res = ws.connect(WS_URL, { headers: REQ_HEADERS }, (socket) => {
-
     socket.on('open', () => {
-      console.log(`[VU ${__VU}] 连接成功`);
+      console.log(`[VU ${__VU}] (${me.user_id}) 连接成功,正准备向 (${partner.user_id}) 发送消息...`);
+      
       socket.setInterval(() => {
-        socket.send(TEST_MESSAGE);
         sendCount++;
+        
+        const message = {
+          client_msg_id: me.user_id, 
+          receiver_id: partner.user_id,
+          chat_type: "single",
+          msg_type: "text",
+          payload: {
+            text: `你好,我是 VU${__VU},这是发给你的第 ${sendCount} 条消息!`,
+          },
+          ext: {},
+        };
+
+        socket.send(JSON.stringify(message));
         
         if (sendCount % 10 === 0) {
           console.log(`[VU ${__VU}] 已发送 ${sendCount} 条`);
@@ -46,10 +71,11 @@ export default function () {
     });
 
     socket.on('message', (msg) => {
-       if (sendCount % 10 === 0) {
+       if (sendCount % 100 === 0) {
         console.log(`[VU ${__VU}] 收到消息: ${msg}`);
        }
     });
+    
     socket.on('error', (e) => console.error(`[VU ${__VU}] 错误`, e.error()));
     socket.on('close', () => console.log(`[VU ${__VU}] 断开连接`));
   });
