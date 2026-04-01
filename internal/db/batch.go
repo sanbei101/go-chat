@@ -105,3 +105,53 @@ func (b *BatchCreateMessagesBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
+
+const batchCreateUsers = `-- name: BatchCreateUsers :batchexec
+INSERT INTO users (username, password)
+VALUES ($1, $2)
+`
+
+type BatchCreateUsersBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type BatchCreateUsersParams struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (q *Queries) BatchCreateUsers(ctx context.Context, arg []BatchCreateUsersParams) *BatchCreateUsersBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Username,
+			a.Password,
+		}
+		batch.Queue(batchCreateUsers, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &BatchCreateUsersBatchResults{br, len(arg), false}
+}
+
+func (b *BatchCreateUsersBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *BatchCreateUsersBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}

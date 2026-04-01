@@ -112,3 +112,10 @@ type Message struct {
 	Ext          json.RawMessage `json:"ext"`
 	CreatedAt    time.Time       `json:"created_at"`
 }
+
+type User struct {
+	UserID    uuid.UUID `json:"user_id"`
+	Username  string    `json:"username"`
+	Password  string    `json:"password"`
+	CreatedAt time.Time `json:"created_at"`
+}
