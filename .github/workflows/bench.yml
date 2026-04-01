@@ -16,7 +16,7 @@ jobs:
           docker compose -f docker-compose.yaml ps
 
       - name: Check chat logs
-        run: docker logs chat || true
+        run: docker logs chat
 
       - uses: grafana/setup-k6-action@v1
 
