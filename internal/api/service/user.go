@@ -132,15 +132,9 @@ func (s *UserService) BatchGenerate(ctx context.Context, req BatchGenerateReq) (
 			Username: username,
 			Password: string(hashed),
 		}
-		token, err := jwt.GenerateToken(username)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to generate token")
-			return nil, err
-		}
 		users[i] = BatchUserResp{
 			Username: username,
 			Password: password,
-			Token:    token,
 		}
 	}
 
@@ -162,6 +156,14 @@ func (s *UserService) BatchGenerate(ctx context.Context, req BatchGenerateReq) (
 	})
 	if batchErr != nil {
 		return nil, batchErr
+	}
+	for i := 0; i < req.Count; i++ {
+		token, err := jwt.GenerateToken(users[i].UserID)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", users[i].UserID).Msg("failed to generate token for user")
+			return nil, err
+		}
+		users[i].Token = token
 	}
 
 	return &BatchGenerateResp{Users: users}, nil
