@@ -6,14 +6,15 @@ export const options = {
   vus: 50,
   duration: '30s',
 };
+const API_Url = 'http://localhost:8801/api/v1/users/batch'; 
+const WS_URL = 'ws://localhost:8800/ws';
 
 
 export function setup() {
   const payload = JSON.stringify({
     count: 50
   });
-  const apiUrl = 'http://154.8.213.38:8801/api/v1/users/batch'; 
-  const res = http.post(apiUrl, payload);
+  const res = http.post(API_Url, payload);
 
   const users = res.json('users');
 
@@ -32,7 +33,6 @@ export default function (users) {
   const partnerIndex = isEven ? vuIndex + 1 : vuIndex - 1;
   const partner = users[partnerIndex];
 
-  const WS_URL = 'ws://154.8.213.38:8800/ws';
   
   const REQ_HEADERS = {
     'Authorization': me.token, 
