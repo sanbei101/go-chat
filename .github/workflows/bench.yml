@@ -6,57 +6,27 @@ on:
 jobs:
   bench:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/postgres:18
-        env:
-          POSTGRES_USER: myuser
-          POSTGRES_PASSWORD: mypassword
-          POSTGRES_DB: database
-        ports:
-          - 5433:5432
-
-      redis:
-        image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/redis:8
-        ports:
-          - 4999:6379
-        command: redis-server --requirepass 123456 --save "" --appendonly no
-
-      chat:
-        image: swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
-        ports:
-          - "8800:8800"
-          - "8801:8801"
-        
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Start services with docker-compose
+        run: |
+          docker compose -f docker-compose.yaml up -d
+          docker compose -f docker-compose.yaml ps
+
+      - name: Check chat logs
+        run: docker logs chat || true
 
       - uses: grafana/setup-k6-action@v1
 
       - name: Install monitor dependencies
         run: sudo apt-get update -y && sudo apt install -y redis-tools postgresql-client
 
-      - name: Check chat logs
-        run: sudo docker logs chat
-
       - name: Run monitor and k6 together
         run: |
           chmod +x monitor.sh
 
-          # 等待 chat 服务真正接受请求
-          echo "等待 chat 服务就绪..."
-          for i in {1..60}; do
-            if curl -sf http://localhost:8801/api/v1/users/batch -o /dev/null 2>&1; then
-              echo "chat 服务已就绪 (耗时 ${i}s)"
-              break
-            fi
-            if [ $i -eq 60 ]; then
-              echo "chat 服务启动超时"
-              exit 1
-            fi
-            sleep 1
-          done
 
           ./monitor.sh &> >(tee monitor.log) &
           MONITOR_PID=$!
@@ -81,3 +51,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
           exit "$K6_EXIT"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.yaml down

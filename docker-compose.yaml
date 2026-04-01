@@ -1,7 +1,32 @@
 services:
-  im:
+  postgres:
+    image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/postgres:18
+    container_name: postgres-chat
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: database
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/redis:8
+    container_name: redis-chat
+    command: redis-server --requirepass 123456 --save "" --appendonly no
+    ports:
+      - "4999:6379"
+
+  chat:
     image: swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
     container_name: chat
     ports:
       - "8800:8800"
       - "8801:8801"
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8801/api/v1/users/batch || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
