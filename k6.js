@@ -1,5 +1,6 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
+import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import http from 'k6/http';
 export const options = {
   vus: 5,
@@ -47,7 +48,7 @@ export default function (users) {
         sendCount++;
         
         const message = {
-          client_msg_id: me.user_id, 
+          client_msg_id: uuidv4(), 
           receiver_id: partner.user_id,
           chat_type: "single",
           msg_type: "text",
