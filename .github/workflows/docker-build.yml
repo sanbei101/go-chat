@@ -34,4 +34,4 @@ jobs:
 
   bench:
     needs: docker-build
-    uses: ./.github/workflows/bench-yml.yml
+    uses: ./.github/workflows/bench.yml
