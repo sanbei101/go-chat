@@ -1,0 +1,72 @@
+name: bench
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/postgres:18
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: database
+        ports:
+          - 5433:5432
+
+      redis:
+        image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/redis:8
+        ports:
+          - 4999:6379
+        command: redis-server --requirepass 123456 --save "" --appendonly no
+
+      chat:
+        image: swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
+        container_name: chat
+        ports:
+          - "8800:8800"
+          - "8801:8801"
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Install monitor dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y redis-tools postgresql-client
+
+      - name: Run monitor and k6 together
+        run: |
+          chmod +x monitor.sh
+
+          ./monitor.sh > monitor.log 2>&1 &
+          MONITOR_PID=$!
+
+          k6 run k6.js > k6.log 2>&1
+          K6_EXIT=$?
+
+          kill "$MONITOR_PID" || true
+          wait "$MONITOR_PID" 2>/dev/null || true
+
+          echo "### 📊 压测监控摘要" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 📋 完整监控日志" >> $GITHUB_STEP_SUMMARY
+          echo '```log' >> $GITHUB_STEP_SUMMARY
+          cat monitor.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 🚀 k6 压测最后 100 行" >> $GITHUB_STEP_SUMMARY
+          echo '```log' >> $GITHUB_STEP_SUMMARY
+          tail -n 100 k6.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          exit "$K6_EXIT"
