@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -163,24 +164,9 @@ func randomPassword(n int) string {
 }
 
 func isUniqueViolation(err error) bool {
-	// pgx wraps unique violation errors
-	// Check for "duplicate key" or error code 23505
 	if err == nil {
 		return false
 	}
 	errStr := err.Error()
-	return contains(errStr, "duplicate key") || contains(errStr, "23505")
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "23505")
 }
