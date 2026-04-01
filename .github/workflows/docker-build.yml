@@ -31,7 +31,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
-    
-    bench:
-      needs: docker-build
-      uses: ./.github/workflows/bench-yml.yml
+
+  bench:
+    needs: docker-build
+    uses: ./.github/workflows/bench-yml.yml
