@@ -35,9 +35,10 @@ jobs:
       - uses: grafana/setup-k6-action@v1
 
       - name: Install monitor dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y redis-tools postgresql-client
+        run: sudo apt install -y redis-tools postgresql-client
+
+      - name: Check chat logs
+        run: sudo docker logs chat
 
       - name: Run monitor and k6 together
         run: |
