@@ -4,3 +4,4 @@ services:
     container_name: chat
     ports:
       - "8800:8800"
+      - "8801:8801"

@@ -9,6 +9,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o worker ./cmd/worker/
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o gateway ./cmd/gateway/
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o api ./cmd/api/
 
 FROM alpine:latest
 
@@ -18,8 +19,9 @@ RUN apk add --no-cache ca-certificates tzdata bash
 
 COPY --from=builder /app/gateway /app/gateway
 COPY --from=builder /app/worker /app/worker
+COPY --from=builder /app/api /app/api
 COPY config.yaml /app/config.yaml
 
 EXPOSE 8800
 
-CMD ["/bin/bash", "-c", "/app/worker & /app/gateway"]
+CMD ["/bin/bash", "-c", "/app/worker & /app/gateway & /app/api"]
