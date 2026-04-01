@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/postgres:18
+    image: postgres:18
     container_name: postgres-chat
     environment:
       POSTGRES_USER: myuser
@@ -8,13 +8,23 @@ services:
       POSTGRES_DB: database
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d database"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   redis:
-    image: swr.cn-north-4.myhuaweicloud.com/sanbei/dhi.io/redis:8
+    image: redis:8
     container_name: redis-chat
     command: redis-server --requirepass 123456 --save "" --appendonly no
     ports:
       - "4999:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "123456", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   chat:
     image: swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
@@ -23,8 +33,10 @@ services:
       - "8800:8800"
       - "8801:8801"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8801/api/v1/users/batch || exit 1"]
       interval: 2s

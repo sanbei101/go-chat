@@ -28,6 +28,8 @@ jobs:
         tags: |
           swr.cn-north-4.myhuaweicloud.com/sanbei/chat:${{ github.sha }}
           swr.cn-north-4.myhuaweicloud.com/sanbei/chat:latest
+          ghcr.io/sanbei/chat:${{ github.sha }}
+          ghcr.io/sanbei/chat:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
