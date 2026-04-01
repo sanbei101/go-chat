@@ -1,4 +1,4 @@
-name: bench
+name: 集成测试
 on:
   workflow_call:
   workflow_dispatch:

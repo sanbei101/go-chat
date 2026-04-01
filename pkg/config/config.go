@@ -28,6 +28,22 @@ func New(path ...string) *Config {
 	return config
 }
 
+func NewTest() *Config {
+	return &Config{
+		Gateway: GatewayConfig{
+			MaxTimeout: 10,
+		},
+		Postgres: PostgresConfig{
+			DSN: "host=localhost port=5433 user=myuser password=mypassword dbname=database sslmode=disable",
+		},
+		Redis: RedisConfig{
+			Addr:     "localhost:4999",
+			DB:       0,
+			Password: "123456",
+		},
+	}
+}
+
 type GatewayConfig struct {
 	MaxTimeout int `yaml:"max_timeout"`
 }

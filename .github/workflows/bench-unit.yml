@@ -1,0 +1,21 @@
+name: 单元测试
+on:
+  workflow_dispatch:
+jobs:
+  bench-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: boot redis
+        run: docker compose -f docker-compose.yaml up -d redis
+
+      - name: Run benchmark tests
+        run: |
+          go build -o bench cmd/bench/main.go
+          ./bench
