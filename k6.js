@@ -3,7 +3,7 @@ import { check } from 'k6';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import http from 'k6/http';
 export const options = {
-  vus: 5,
+  vus: 50,
   duration: '30s',
 };
 
@@ -60,7 +60,7 @@ export default function (users) {
 
         socket.send(JSON.stringify(message));
         
-        if (sendCount % 10 === 0) {
+        if (sendCount % 100 === 0) {
           console.log(`[VU ${__VU}] 已发送 ${sendCount} 条`);
         }
       }, 100);
