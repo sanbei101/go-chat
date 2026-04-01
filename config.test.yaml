@@ -2,9 +2,9 @@ gateway:
   max_timeout: 10
 
 postgres:
-  dsn: "host=localhost port=5433 user=myuser password=mypassword dbname=database sslmode=disable"
+  dsn: "host=postgres port=5432 user=myuser password=mypassword dbname=database sslmode=disable"
 
 redis:
-  addr: "localhost:4999"
+  addr: "redis:6379"
   password: "123456"
   db: 0
