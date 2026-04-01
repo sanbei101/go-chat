@@ -9,6 +9,7 @@ FROM users
 WHERE username = sqlc.arg(username)
 LIMIT 1;
 
--- name: BatchCreateUsers :batchexec
+-- name: BatchCreateUsers :batchone
 INSERT INTO users (username, password)
-VALUES (sqlc.arg(username), sqlc.arg(password));
+VALUES (sqlc.arg(username), sqlc.arg(password))
+RETURNING user_id;

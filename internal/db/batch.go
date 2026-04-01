@@ -106,9 +106,10 @@ func (b *BatchCreateMessagesBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const batchCreateUsers = `-- name: BatchCreateUsers :batchexec
+const batchCreateUsers = `-- name: BatchCreateUsers :batchone
 INSERT INTO users (username, password)
 VALUES ($1, $2)
+RETURNING user_id
 `
 
 type BatchCreateUsersBatchResults struct {
@@ -135,18 +136,20 @@ func (q *Queries) BatchCreateUsers(ctx context.Context, arg []BatchCreateUsersPa
 	return &BatchCreateUsersBatchResults{br, len(arg), false}
 }
 
-func (b *BatchCreateUsersBatchResults) Exec(f func(int, error)) {
+func (b *BatchCreateUsersBatchResults) QueryRow(f func(int, uuid.UUID, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
+		var user_id uuid.UUID
 		if b.closed {
 			if f != nil {
-				f(t, ErrBatchAlreadyClosed)
+				f(t, user_id, ErrBatchAlreadyClosed)
 			}
 			continue
 		}
-		_, err := b.br.Exec()
+		row := b.br.QueryRow()
+		err := row.Scan(&user_id)
 		if f != nil {
-			f(t, err)
+			f(t, user_id, err)
 		}
 	}
 }

@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/google/uuid"
+	"github.com/phuslu/log"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sanbei101/im/internal/db"
@@ -72,9 +72,6 @@ func (s *UserService) Register(ctx context.Context, req RegisterReq) (*UserResp,
 		Password: string(hashed),
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
-			return nil, ErrUserExists
-		}
 		return nil, err
 	}
 
@@ -122,33 +119,49 @@ func (s *UserService) BatchGenerate(ctx context.Context, req BatchGenerateReq) (
 	}
 
 	users := make([]BatchUserResp, req.Count)
+	batchCreatedUser := make([]db.BatchCreateUsersParams, req.Count)
 	for i := 0; i < req.Count; i++ {
 		username := "user_" + uuid.New().String()[:8]
 		password := randomPassword(12)
 		hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
+			log.Error().Err(err).Msg("failed to hash password")
 			return nil, err
 		}
-
-		created, err := s.q.CreateUser(ctx, db.CreateUserParams{
+		batchCreatedUser[i] = db.BatchCreateUsersParams{
 			Username: username,
 			Password: string(hashed),
-		})
+		}
+		token, err := jwt.GenerateToken(username)
 		if err != nil {
+			log.Error().Err(err).Msg("failed to generate token")
 			return nil, err
 		}
-
-		token, err := jwt.GenerateToken(created.UserID.String())
-		if err != nil {
-			return nil, err
-		}
-
 		users[i] = BatchUserResp{
-			UserID:   created.UserID.String(),
 			Username: username,
 			Password: password,
 			Token:    token,
 		}
+	}
+
+	result := s.q.BatchCreateUsers(ctx, batchCreatedUser)
+	defer result.Close()
+	var batchErr error
+	result.QueryRow(func(i int, returnedID uuid.UUID, err error) {
+		if err != nil {
+			if batchErr == nil {
+				batchErr = err
+				log.Error().Err(err).
+					Int("index", i).
+					Str("username", batchCreatedUser[i].Username).
+					Msg("failed to execute batch insert for user")
+			}
+			return
+		}
+		users[i].UserID = returnedID.String()
+	})
+	if batchErr != nil {
+		return nil, batchErr
 	}
 
 	return &BatchGenerateResp{Users: users}, nil
@@ -161,12 +174,4 @@ func randomPassword(n int) string {
 		b[i] = letters[int(uuid.New().ID())%len(letters)]
 	}
 	return string(b)
-}
-
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	return strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "23505")
 }
