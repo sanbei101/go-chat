@@ -21,6 +21,8 @@ import (
 const (
 	StreamConsumeFromBeginning = "0"
 	StreamConsumeFromNewOnly   = "$"
+	batchQueueSize             = 100
+	batchFlushInterval         = 10 * time.Millisecond
 )
 
 type Gateway struct {
@@ -28,6 +30,7 @@ type Gateway struct {
 	conns  map[string]map[*client]struct{}
 	redis  *redis.Client
 	config *config.Config
+	batch  chan []byte
 }
 
 type client struct {
@@ -44,7 +47,7 @@ func (c *client) writePump(ctx context.Context) {
 }
 
 func New(config *config.Config) *Gateway {
-	return &Gateway{
+	g := &Gateway{
 		conns: map[string]map[*client]struct{}{},
 		redis: redis.NewClient(&redis.Options{
 			Addr:     config.Redis.Addr,
@@ -52,6 +55,49 @@ func New(config *config.Config) *Gateway {
 			DB:       config.Redis.DB,
 		}),
 		config: config,
+		batch:  make(chan []byte, batchQueueSize*10),
+	}
+	go g.batchFlushLoop()
+	return g
+}
+
+func (g *Gateway) batchFlushLoop() {
+	ticker := time.NewTicker(batchFlushInterval)
+	defer ticker.Stop()
+	buf := make([][]byte, 0, batchQueueSize)
+	for {
+		select {
+		case msg := <-g.batch:
+			buf = append(buf, msg)
+			if len(buf) >= batchQueueSize {
+				g.flushBatch(buf)
+				buf = buf[:0]
+			}
+		case <-ticker.C:
+			if len(buf) > 0 {
+				g.flushBatch(buf)
+				buf = buf[:0]
+			}
+		}
+	}
+}
+
+func (g *Gateway) flushBatch(msgs [][]byte) {
+	if len(msgs) == 0 {
+		return
+	}
+	ctx := context.Background()
+	pipe := g.redis.Pipeline()
+	for _, bin := range msgs {
+		pipe.XAdd(ctx, &redis.XAddArgs{
+			Stream: "messages:inbound",
+			MaxLen: 100000,
+			Approx: true,
+			Values: map[string]any{"data": string(bin)},
+		})
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		log.Error().Err(err).Int("count", len(msgs)).Msg("gateway batch flush failed")
 	}
 }
 
@@ -100,7 +146,11 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	go c.writePump(context.Background())
-
+	senderUUID, err := uuid.Parse(userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("gateway parse user_id to uuid failed")
+		return
+	}
 	for {
 		_, payload, err := conn.Read(r.Context())
 		if err != nil {
@@ -138,24 +188,17 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 			}
 			continue
 		}
+		message.SenderID = senderUUID
 		message.ServerTime = time.Now().UnixMicro()
-		message.SenderID = uuid.MustParse(userID)
 		bin, err := json.Marshal(message)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
 			continue
 		}
-
-		err = g.redis.XAdd(context.Background(), &redis.XAddArgs{
-			Stream: "messages:inbound",
-			MaxLen: 100000,
-			Approx: true,
-			Values: map[string]any{"data": string(bin)},
-		}).Err()
-
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Msg("gateway push message to redis failed")
-			continue
+		select {
+		case g.batch <- bin:
+		default:
+			log.Warn().Str("user_id", userID).Msg("gateway batch queue full, dropping message")
 		}
 	}
 }
