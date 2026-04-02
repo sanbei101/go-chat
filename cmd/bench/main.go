@@ -65,7 +65,11 @@ func startMockWorker(rdb *redis.Client) {
 
 func main() {
 	cfg := config.NewTest()
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
 
 	gw := gateway.New(cfg)
 	go gw.SubscribeFromWorker(context.Background())
