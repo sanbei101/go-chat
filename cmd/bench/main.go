@@ -54,7 +54,7 @@ func startMockWorker(rdb *redis.Client) {
 			msgIDs = append(msgIDs, msg.ID)
 			pipe.XAdd(ctx, &redis.XAddArgs{
 				Stream: "messages:deliver",
-				Values: msg.Values,
+				Values: map[string]any{"data": msg.Values["data"]},
 			})
 		}
 		pipe.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
