@@ -222,7 +222,7 @@ func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
 				Group:    "gateway_group",
 				Consumer: "gateway1",
 				Streams:  []string{"messages:deliver", ">"},
-				Count:    10,
+				Count:    1000,
 				Block:    time.Second,
 				NoAck:    false,
 			}).Result()

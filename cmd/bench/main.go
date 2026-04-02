@@ -144,6 +144,28 @@ func main() {
 
 	fmt.Println("开始压测:互相发送消息...")
 	startTime := time.Now()
+	var lastSentCount int64
+	var lastReceivedCount int64
+	stopReport := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				currentSent := sentCount.Load()
+				currentReceived := receivedCount.Load()
+				fmt.Printf("当前速率: 发送 %.2f msg/s, 接收 %.2f msg/s\n",
+					float64(currentSent-lastSentCount),
+					float64(currentReceived-lastReceivedCount),
+				)
+				lastSentCount = currentSent
+				lastReceivedCount = currentReceived
+			case <-stopReport:
+				return
+			}
+		}
+	}()
 	var wgSend sync.WaitGroup
 	wgSend.Add(UserCount)
 
@@ -178,6 +200,7 @@ func main() {
 	}
 
 	wgSend.Wait()
+	close(stopReport)
 
 	time.Sleep(2 * time.Second)
 
