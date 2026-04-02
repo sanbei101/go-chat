@@ -21,7 +21,7 @@ import (
 const (
 	StreamConsumeFromBeginning = "0"
 	StreamConsumeFromNewOnly   = "$"
-	batchQueueSize             = 1000
+	batchQueueSize             = 10000
 	batchFlushInterval         = 10 * time.Millisecond
 )
 
