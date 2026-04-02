@@ -23,7 +23,7 @@ import (
 
 const (
 	UserCount    = 5000
-	MessageCount = 100
+	MessageCount = 10
 )
 
 var (
