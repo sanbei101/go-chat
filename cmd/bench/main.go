@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	UserCount    = 5000
+	UserCount    = 50000
 	MessageCount = 10
 )
 
@@ -155,10 +155,10 @@ func main() {
 			case <-ticker.C:
 				currentSent := sentCount.Load()
 				currentReceived := receivedCount.Load()
-				fmt.Printf("当前速率: 发送 %.2f msg/s, 接收 %.2f msg/s\n",
-					float64(currentSent-lastSentCount),
-					float64(currentReceived-lastReceivedCount),
-				)
+				log.Info().
+					Int64("发送速率 msg/s", currentSent-lastSentCount).
+					Int64("接收速率 msg/s", currentReceived-lastReceivedCount).
+					Msg("当前速率")
 				lastSentCount = currentSent
 				lastReceivedCount = currentReceived
 			case <-stopReport:
@@ -224,6 +224,4 @@ func main() {
 	fmt.Printf("发送消息: %d\n", sentCount.Load())
 	fmt.Printf("接收消息: %d\n", receivedCount.Load())
 	fmt.Printf("错误数量: %d\n", errCount.Load())
-	fmt.Printf("发送 QPS: %.2f msg/s\n", float64(sentCount.Load())/elapsed.Seconds())
-	fmt.Printf("接收 QPS: %.2f msg/s\n", float64(receivedCount.Load())/elapsed.Seconds())
 }
