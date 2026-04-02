@@ -153,7 +153,7 @@ func main() {
 				} else {
 					sentCount.Add(1)
 				}
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(1000 * time.Millisecond)
 			}
 		}(i)
 	}
