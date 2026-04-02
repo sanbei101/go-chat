@@ -26,3 +26,11 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -n 100 bench.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          
+      - name: Upload pprof results
+        uses: actions/upload-artifact@v7
+        with:
+          name: pprof-results
+          path: |
+            cpu.prof
+            mem.prof

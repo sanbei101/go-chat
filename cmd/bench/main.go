@@ -7,12 +7,15 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	"github.com/phuslu/log"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/sanbei101/im/internal/db"
@@ -82,6 +85,18 @@ func main() {
 
 	wsURL := "ws" + server.URL[4:] + "/ws"
 
+	cpuFile, err := os.Create("cpu.prof")
+	if err != nil {
+		log.Error().Err(err).Msg("创建 CPU profile 文件失败")
+		return
+	}
+	defer cpuFile.Close()
+
+	if err := pprof.StartCPUProfile(cpuFile); err != nil {
+		log.Error().Err(err).Msg("启动 CPU profile 失败")
+		return
+	}
+
 	fmt.Printf("正在生成 %d 个用户并建立连接...\n", UserCount)
 	var users []uuid.UUID
 	conns := make([]*websocket.Conn, UserCount)
@@ -125,9 +140,9 @@ func main() {
 		}(i)
 	}
 	wgConnect.Wait()
-	fmt.Printf("成功建立 %d 个连接，失败 %d 个\n", UserCount-int(errCount.Load()), errCount.Load())
+	fmt.Printf("成功建立 %d 个连接,失败 %d 个\n", UserCount-int(errCount.Load()), errCount.Load())
 
-	fmt.Println("开始压测：互相发送消息...")
+	fmt.Println("开始压测:互相发送消息...")
 	startTime := time.Now()
 	var wgSend sync.WaitGroup
 	wgSend.Add(UserCount)
@@ -167,6 +182,20 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	elapsed := time.Since(startTime)
+
+	pprof.StopCPUProfile()
+
+	memFile, err := os.Create("mem.prof")
+	if err != nil {
+		log.Error().Err(err).Msg("创建内存 profile 文件失败")
+	} else {
+		if err := pprof.WriteHeapProfile(memFile); err != nil {
+			log.Error().Err(err).Msg("写入内存 profile 失败")
+		}
+		memFile.Close()
+		log.Info().Msg("已生成 mem.prof 文件")
+	}
+
 	fmt.Printf("--- 压测结果 ---\n")
 	fmt.Printf("耗时: %v\n", elapsed)
 	fmt.Printf("发送消息: %d\n", sentCount.Load())
