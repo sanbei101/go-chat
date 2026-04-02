@@ -23,6 +23,6 @@ jobs:
           go build -o bench cmd/bench/main.go
           ./bench > bench.log 2>&1
           echo "### 📊 压测监控摘要" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo '```'' >> $GITHUB_STEP_SUMMARY
           tail -n 100 bench.log >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
