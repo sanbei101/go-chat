@@ -35,10 +35,10 @@ sql:
               type: "Time"
           - db_type: "jsonb"
             go_type:
-              import: "encoding/json"
-              type: "RawMessage"
+              import: "encoding/json/jsontext"
+              type: "Value"
           - db_type: "jsonb"
             nullable: true
             go_type:
-              import: "encoding/json"
-              type: "RawMessage"
+              import: "encoding/json/jsontext"
+              type: "Value"

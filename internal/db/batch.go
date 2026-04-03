@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
+	"encoding/json/jsontext"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -52,16 +52,16 @@ type BatchCreateMessagesBatchResults struct {
 }
 
 type BatchCreateMessagesParams struct {
-	MsgID        uuid.UUID       `json:"msg_id"`
-	ClientMsgID  uuid.UUID       `json:"client_msg_id"`
-	SenderID     uuid.UUID       `json:"sender_id"`
-	ReceiverID   uuid.UUID       `json:"receiver_id"`
-	ChatType     ChatType        `json:"chat_type"`
-	MsgType      MessageType     `json:"msg_type"`
-	ServerTime   int64           `json:"server_time"`
-	ReplyToMsgID *uuid.UUID      `json:"reply_to_msg_id"`
-	Payload      json.RawMessage `json:"payload"`
-	Ext          json.RawMessage `json:"ext"`
+	MsgID        uuid.UUID      `json:"msg_id"`
+	ClientMsgID  uuid.UUID      `json:"client_msg_id"`
+	SenderID     uuid.UUID      `json:"sender_id"`
+	ReceiverID   uuid.UUID      `json:"receiver_id"`
+	ChatType     ChatType       `json:"chat_type"`
+	MsgType      MessageType    `json:"msg_type"`
+	ServerTime   int64          `json:"server_time"`
+	ReplyToMsgID *uuid.UUID     `json:"reply_to_msg_id"`
+	Payload      jsontext.Value `json:"payload"`
+	Ext          jsontext.Value `json:"ext"`
 }
 
 func (q *Queries) BatchCreateMessages(ctx context.Context, arg []BatchCreateMessagesParams) *BatchCreateMessagesBatchResults {
