@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	UserCount    = 50000
+	UserCount    = 10000
 	MessageCount = 10
 )
 

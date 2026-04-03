@@ -18,8 +18,27 @@ jobs:
       - name: boot redis
         run: docker compose -f docker-compose.yaml up -d redis
 
+      - name: Tune Linux Kernel & Open Files Limit
+        run: |
+          echo "=== 当前系统默认限制 ==="
+          ulimit -a
+          
+          echo "=== 开始注入内核调优参数 ==="
+
+          sudo sysctl -w fs.file-max=2000000
+          
+          sudo sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+          
+          sudo sysctl -w net.core.somaxconn=65535
+          sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216"
+          sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216"
+          sudo sysctl -w net.ipv4.tcp_tw_reuse=1
+          
+          sudo prlimit --pid $$ --nofile=1000000:1000000
+
       - name: Run benchmark tests
         run: |
+          ulimit -n 1000000
           go build -o bench cmd/bench/main.go
           ./bench > bench.log 2>&1
           echo "### 📊 压测监控摘要" >> $GITHUB_STEP_SUMMARY

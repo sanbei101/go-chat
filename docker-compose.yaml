@@ -19,6 +19,10 @@ services:
   redis:
     image: redis:8
     container_name: redis-chat
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
     command: redis-server --requirepass 123456 --save "" --appendonly no
     ports:
       - "4999:6379"
