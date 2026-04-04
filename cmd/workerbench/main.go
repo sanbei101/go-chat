@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"runtime/pprof"
