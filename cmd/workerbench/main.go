@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"runtime/pprof"
@@ -32,7 +33,6 @@ const (
 
 func startWorkerBench(ctx context.Context, rdb *redis.Client, queries *db.Queries, workerID int) {
 	consumerName := fmt.Sprintf("bench-worker-%d", workerID)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,9 +60,9 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 	}
 
 	for _, stream := range result {
-		var params []db.BatchCreateMessagesParams
-		var msgIDs []string
-		var msgs []*db.Message
+		params := make([]db.BatchCreateMessagesParams, 0, len(stream.Messages))
+		msgIDs := make([]string, 0, len(stream.Messages))
+		msgs := make([]*db.Message, 0, len(stream.Messages))
 
 		for _, msg := range stream.Messages {
 			msgIDs = append(msgIDs, msg.ID)
@@ -167,7 +167,7 @@ func main() {
 	fmt.Println("Pre-populating messages:inbound stream...")
 	prepopulateStart := time.Now()
 	pipe := rdb.Pipeline()
-	for i := 0; i < MessageCount; i++ {
+	for i := range MessageCount {
 		msg := db.Message{
 			MsgID:       uuid.New(),
 			ClientMsgID: uuid.New(),
@@ -176,7 +176,7 @@ func main() {
 			ChatType:    db.ChatTypeSingle,
 			MsgType:     db.MessageTypeText,
 			ServerTime:  time.Now().UnixNano(),
-			Payload:     json.RawMessage(fmt.Sprintf(`{"text": "bench message %d"}`, i)),
+			Payload:     jsontext.Value(fmt.Sprintf(`{"text": "bench message %d"}`, i)),
 		}
 		bin, _ := json.Marshal(msg)
 		pipe.XAdd(ctx, &redis.XAddArgs{
@@ -213,16 +213,13 @@ func main() {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	completed := false
-	for !completed {
-		select {
-		case <-ticker.C:
-			current := processedCount.Load()
-			rate := float64(current) / time.Since(startTime).Seconds()
-			fmt.Printf("Processed: %d / %d (%.2f msg/s)\n", current, MessageCount, rate)
-			if current >= int64(MessageCount) {
-				completed = true
-			}
+	for {
+		<-ticker.C
+		current := processedCount.Load()
+		rate := float64(current) / time.Since(startTime).Seconds()
+		fmt.Printf("Processed: %d / %d (%.2f msg/s)\n", current, MessageCount, rate)
+		if current >= int64(MessageCount) {
+			break
 		}
 	}
 

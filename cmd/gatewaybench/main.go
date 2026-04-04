@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -184,7 +185,7 @@ func main() {
 					ClientMsgID: uuid.New(),
 					ReceiverID:  users[receiverIdx],
 					ChatType:    db.ChatTypeSingle,
-					Payload:     json.RawMessage(fmt.Sprintf(`{"text": "Hello from user %d to user %d, msg %d"}`, senderIdx, receiverIdx, j)),
+					Payload:     jsontext.Value(fmt.Sprintf(`{"text": "Hello from user %d to user %d, msg %d"}`, senderIdx, receiverIdx, j)),
 				}
 				bin, _ := json.Marshal(msg)
 
