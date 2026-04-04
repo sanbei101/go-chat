@@ -26,9 +26,9 @@ var (
 )
 
 const (
-	MessageCount = 100000
+	MessageCount = 500000
 	WorkerCount  = 10
-	BatchSize    = 100
+	BatchSize    = 1000
 )
 
 func startWorkerBench(ctx context.Context, rdb *redis.Client, queries *db.Queries, workerID int) {
@@ -169,11 +169,15 @@ func main() {
 	prepopulateStart := time.Now()
 	pipe := rdb.Pipeline()
 	for i := range MessageCount {
+		msgID, _ := uuid.NewV7()
+		clientID, _ := uuid.NewV7()
+		senderID, _ := uuid.NewV7()
+		receiverID, _ := uuid.NewV7()
 		msg := db.Message{
-			MsgID:       uuid.New(),
-			ClientMsgID: uuid.New(),
-			SenderID:    uuid.New(),
-			ReceiverID:  uuid.New(),
+			MsgID:       msgID,
+			ClientMsgID: clientID,
+			SenderID:    senderID,
+			ReceiverID:  receiverID,
 			ChatType:    db.ChatTypeSingle,
 			MsgType:     db.MessageTypeText,
 			ServerTime:  time.Now().UnixNano(),
@@ -213,13 +217,18 @@ func main() {
 	startTime := time.Now()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-
+	var lastProcessed int64
 	for {
 		<-ticker.C
-		current := processedCount.Load()
-		rate := float64(current) / time.Since(startTime).Seconds()
-		fmt.Printf("Processed: %d / %d (%.2f msg/s)\n", current, MessageCount, rate)
-		if current >= int64(MessageCount) {
+		currentProcessed := processedCount.Load()
+		currentErrors := errorCount.Load()
+		log.Info().
+			Int64("processed", currentProcessed).
+			Int64("errors", currentErrors).
+			Int64("处理速率 msg/s", currentProcessed-lastProcessed).
+			Msg("当前速率")
+		lastProcessed = currentProcessed
+		if currentProcessed+currentErrors >= int64(MessageCount) {
 			cancel()
 			break
 		}
@@ -244,8 +253,6 @@ func main() {
 	fmt.Printf("Processed: %d\n", processedCount.Load())
 	fmt.Printf("Errors: %d\n", errorCount.Load())
 	fmt.Printf("Elapsed: %v\n", elapsed)
-	fmt.Printf("Throughput: %.2f msg/s\n", float64(MessageCount)/elapsed.Seconds())
-
 	wg.Wait()
 
 	fmt.Printf("Worker Bench: %d messages, %d workers, batch size %d\n", MessageCount, WorkerCount, BatchSize)

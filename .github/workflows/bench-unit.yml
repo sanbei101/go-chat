@@ -38,9 +38,9 @@ jobs:
 
       - name: Run benchmark tests
         run: |
-          GOEXPERIMENT=jsonv2 go build -o bench cmd/bench/main.go
+          GOEXPERIMENT=jsonv2 go build -o bench cmd/gatewaybench/main.go
           ./bench > bench.log 2>&1
-          echo "### 📊 压测监控摘要" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 Gateway 压测监控摘要" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -n 100 bench.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -92,7 +92,7 @@ jobs:
         run: |
           GOEXPERIMENT=jsonv2 go build -o bench cmd/workerbench/main.go
           ./bench > bench.log 2>&1
-          echo "### 📊 压测监控摘要" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 Worker 压测监控摘要" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -n 100 bench.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
