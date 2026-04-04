@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	processedCount int64
-	errorCount     int64
+	processedCount atomic.Int64
+	errorCount     atomic.Int64
 )
 
 const (
@@ -101,7 +101,7 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 			}
 			if batchErr != nil {
 				log.Error().Err(batchErr).Msg("batch insert error")
-				atomic.AddInt64(&errorCount, int64(len(params)))
+				errorCount.Add(int64(len(params)))
 				return
 			}
 
@@ -118,13 +118,13 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 			}
 			if _, err := pipe.Exec(ctx); err != nil {
 				log.Error().Err(err).Msg("publish to deliver failed")
-				atomic.AddInt64(&errorCount, int64(len(msgs)))
+				errorCount.Add(int64(len(msgs)))
 				return
 			}
 
 			// Ack messages
 			rdb.XAck(ctx, "messages:inbound", "worker_group_bench", msgIDs...)
-			atomic.AddInt64(&processedCount, int64(len(msgs)))
+			processedCount.Add(int64(len(msgs)))
 		}
 	}
 }
