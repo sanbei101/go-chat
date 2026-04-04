@@ -129,10 +129,10 @@ jobs:
           psql -c "SELECT * FROM messages LIMIT 5;"
         env:
           PGPASSWORD: mypassword
-          PGPORT=5433
-          PGHOST=localhost
-          PGUSER=myuser
-          PGDATABASE=database
+          PGPORT: 5433
+          PGHOST: localhost
+          PGUSER: myuser
+          PGDATABASE: database
 
       - name: Upload pprof results
         uses: actions/upload-artifact@v7
