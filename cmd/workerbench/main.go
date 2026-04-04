@@ -28,7 +28,7 @@ var (
 const (
 	MessageCount = 500000
 	WorkerCount  = 10
-	BatchSize    = 1000
+	BatchSize    = 10000
 )
 
 func startWorkerBench(ctx context.Context, rdb *redis.Client, queries *db.Queries, workerID int) {
