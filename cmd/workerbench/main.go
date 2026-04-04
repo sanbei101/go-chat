@@ -195,5 +195,34 @@ func main() {
 		}(i)
 	}
 
+	// Poll for completion
+	fmt.Println("Waiting for processing to complete...")
+	startTime := time.Now()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	completed := false
+	for !completed {
+		select {
+		case <-ticker.C:
+			current := processedCount.Load()
+			rate := float64(current) / time.Since(startTime).Seconds()
+			fmt.Printf("Processed: %d / %d (%.2f msg/s)\n", current, MessageCount, rate)
+			if current >= int64(MessageCount) {
+				completed = true
+			}
+		}
+	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("\n--- Bench Results ---\n")
+	fmt.Printf("Total messages: %d\n", MessageCount)
+	fmt.Printf("Processed: %d\n", processedCount.Load())
+	fmt.Printf("Errors: %d\n", errorCount.Load())
+	fmt.Printf("Elapsed: %v\n", elapsed)
+	fmt.Printf("Throughput: %.2f msg/s\n", float64(MessageCount)/elapsed.Seconds())
+
+	wg.Wait()
+
 	fmt.Printf("Worker Bench: %d messages, %d workers, batch size %d\n", MessageCount, WorkerCount, BatchSize)
 }
