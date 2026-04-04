@@ -140,7 +140,8 @@ func main() {
 		DB:       cfg.Redis.DB,
 	})
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	pool, err := pgxpool.New(ctx, cfg.Postgres.DSN)
 	if err != nil {
@@ -219,6 +220,7 @@ func main() {
 		rate := float64(current) / time.Since(startTime).Seconds()
 		fmt.Printf("Processed: %d / %d (%.2f msg/s)\n", current, MessageCount, rate)
 		if current >= int64(MessageCount) {
+			cancel()
 			break
 		}
 	}
