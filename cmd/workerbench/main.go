@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -152,6 +154,16 @@ func main() {
 
 	queries := db.New(pool)
 
+	cpuFile, err := os.Create("cpu.prof")
+	if err != nil {
+		log.Fatal().Err(err).Msg("create cpu profile failed")
+	}
+	defer cpuFile.Close()
+	if err := pprof.StartCPUProfile(cpuFile); err != nil {
+		log.Fatal().Err(err).Msg("start cpu profile failed")
+	}
+	defer pprof.StopCPUProfile()
+
 	fmt.Println("Pre-populating messages:inbound stream...")
 	prepopulateStart := time.Now()
 	pipe := rdb.Pipeline()
@@ -215,6 +227,19 @@ func main() {
 	}
 
 	elapsed := time.Since(startTime)
+
+	pprof.StopCPUProfile()
+
+	memFile, err := os.Create("mem.prof")
+	if err != nil {
+		log.Error().Err(err).Msg("create mem profile failed")
+	} else {
+		if err := pprof.WriteHeapProfile(memFile); err != nil {
+			log.Error().Err(err).Msg("write heap profile failed")
+		}
+		memFile.Close()
+	}
+
 	fmt.Printf("\n--- Bench Results ---\n")
 	fmt.Printf("Total messages: %d\n", MessageCount)
 	fmt.Printf("Processed: %d\n", processedCount.Load())
