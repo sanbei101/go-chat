@@ -147,7 +147,7 @@ func main() {
 	startTime := time.Now()
 	var lastSentCount int64
 	var lastReceivedCount int64
-	stopReport := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -162,7 +162,7 @@ func main() {
 					Msg("当前速率")
 				lastSentCount = currentSent
 				lastReceivedCount = currentReceived
-			case <-stopReport:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -201,7 +201,7 @@ func main() {
 	}
 
 	wgSend.Wait()
-	close(stopReport)
+	cancel()
 
 	time.Sleep(2 * time.Second)
 
