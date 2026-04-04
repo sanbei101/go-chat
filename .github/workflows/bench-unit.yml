@@ -120,6 +120,20 @@ jobs:
           go tool pprof -top -cum -nodecount=20 ./bench mem.prof >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY 
       
+      - name: Install monitor dependencies
+        run: sudo apt update -y && sudo apt install -y postgresql-client
+
+      - name: Read Postgresql Table
+        run: |
+          psql -c "SELECT COUNT(*) FROM messages;"
+          psql -c "SELECT * FROM messages LIMIT 5;"
+        env:
+          PGPASSWORD: mypassword
+          PGPORT=5433
+          PGHOST=localhost
+          PGUSER=myuser
+          PGDATABASE=database
+
       - name: Upload pprof results
         uses: actions/upload-artifact@v7
         with:
