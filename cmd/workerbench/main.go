@@ -60,7 +60,7 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 	}
 
 	for _, stream := range result {
-		params := make([]db.BatchCreateMessagesParams, 0, len(stream.Messages))
+		params := make([]db.BatchCopyMessagesParams, 0, len(stream.Messages))
 		msgIDs := make([]string, 0, len(stream.Messages))
 		msgs := make([]*db.Message, 0, len(stream.Messages))
 
@@ -76,7 +76,7 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 				continue
 			}
 			msgs = append(msgs, &chatMsg)
-			params = append(params, db.BatchCreateMessagesParams{
+			params = append(params, db.BatchCopyMessagesParams{
 				MsgID:        chatMsg.MsgID,
 				ClientMsgID:  chatMsg.ClientMsgID,
 				SenderID:     chatMsg.SenderID,
@@ -91,18 +91,9 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 		}
 
 		if len(params) > 0 {
-			batchResult := queries.BatchCreateMessages(ctx, params)
-			var batchErr error
-			batchResult.Exec(func(i int, err error) {
-				if err != nil {
-					batchErr = err
-				}
-			})
-			if err := batchResult.Close(); err != nil {
-				log.Error().Err(err).Msg("batch close error")
-			}
-			if batchErr != nil {
-				log.Error().Err(batchErr).Msg("batch insert error")
+			_, err := queries.BatchCopyMessages(ctx, params)
+			if err != nil {
+				log.Error().Err(err).Msg("batch insert error")
 				errorCount.Add(int64(len(params)))
 				return
 			}
