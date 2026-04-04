@@ -211,7 +211,7 @@ func main() {
 	// Poll for completion
 	fmt.Println("Waiting for processing to complete...")
 	startTime := time.Now()
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {
