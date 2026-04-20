@@ -73,9 +73,9 @@ func (s *Service) processInbound(ctx context.Context) {
 	}
 
 	for _, stream := range result {
-		var msgs []*db.Message
-		var params []db.BatchCreateMessagesParams
-		var msgIDs []string
+		params := make([]db.BatchCopyMessagesParams, 0, len(stream.Messages))
+		msgIDs := make([]string, 0, len(stream.Messages))
+		msgs := make([]*db.Message, 0, len(stream.Messages))
 
 		for _, msg := range stream.Messages {
 			msgIDs = append(msgIDs, msg.ID)
@@ -89,7 +89,7 @@ func (s *Service) processInbound(ctx context.Context) {
 				continue
 			}
 			msgs = append(msgs, &chatMsg)
-			params = append(params, db.BatchCreateMessagesParams{
+			params = append(params, db.BatchCopyMessagesParams{
 				MsgID:        chatMsg.MsgID,
 				ClientMsgID:  chatMsg.ClientMsgID,
 				SenderID:     chatMsg.SenderID,
@@ -102,29 +102,17 @@ func (s *Service) processInbound(ctx context.Context) {
 				Ext:          chatMsg.Ext,
 			})
 		}
-
-		if len(params) > 0 {
-			batchResult := s.queries.BatchCreateMessages(ctx, params)
-			var batchErr error
-			batchResult.Exec(func(i int, err error) {
-				if err != nil {
-					batchErr = err
-					log.Error().Err(err).Msg("worker batch insert error")
-				}
-			})
-			if err := batchResult.Close(); err != nil {
-				log.Error().Err(err).Msg("worker batch close error")
-			}
-			if batchErr != nil {
-				log.Error().Err(batchErr).Msg("worker batch insert failed")
-				continue
-			}
-			if err := s.publishDeliverBatch(ctx, msgs); err != nil {
-				log.Error().Err(err).Msg("worker publish deliver batch failed")
-				continue
-			}
-			s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
+		_, err := s.queries.BatchCopyMessages(ctx, params)
+		if err != nil {
+			log.Error().Err(err).Msg("batch insert error")
+			return
 		}
+		if err := s.publishDeliverBatch(ctx, msgs); err != nil {
+			log.Error().Err(err).Msg("worker publish deliver batch failed")
+			continue
+		}
+		s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
+
 	}
 }
 

@@ -31,9 +31,9 @@ func main() {
 	http.HandleFunc("/ws", g.HandleUserMessage)
 
 	wg.Go(func() {
-		log.Info().Msg("starting subscribe from worker...")
-		g.SubscribeFromWorker(ctx)
-		log.Info().Msg("subscribe stopped")
+		log.Info().Msg("starting handle worker messages...")
+		g.HandleWorkerMessages(ctx)
+		log.Info().Msg("handle worker messages stopped")
 	})
 
 	wg.Go(func() {

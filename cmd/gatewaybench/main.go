@@ -76,7 +76,7 @@ func main() {
 	})
 
 	gw := gateway.New(cfg)
-	go gw.SubscribeFromWorker(context.Background())
+	go gw.HandleWorkerMessages(context.Background())
 	go startMockWorker(rdb)
 
 	mux := http.NewServeMux()

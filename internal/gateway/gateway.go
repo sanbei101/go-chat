@@ -203,7 +203,7 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (g *Gateway) SubscribeFromWorker(ctx context.Context) {
+func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
 	err := g.redis.XGroupCreateMkStream(ctx,
 		"messages:deliver",
 		"gateway_group",
