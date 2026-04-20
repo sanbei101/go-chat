@@ -14,6 +14,10 @@ import (
 	"github.com/sanbei101/im/pkg/config"
 )
 
+const (
+	BatchReadSize = 100
+)
+
 type Service struct {
 	redis   *redis.Client
 	queries *db.Queries
@@ -56,7 +60,7 @@ func (s *Service) processInbound(ctx context.Context) {
 		Group:    "worker_group",
 		Consumer: "worker1",
 		Streams:  []string{"messages:inbound", ">"},
-		Count:    100,
+		Count:    BatchReadSize,
 		Block:    time.Second,
 		NoAck:    false,
 	}).Result()
@@ -71,49 +75,52 @@ func (s *Service) processInbound(ctx context.Context) {
 		}
 		return
 	}
+	if len(result) == 0 {
+		log.Warn().Msg("worker xread 结果为空,继续轮询")
+		return
+	}
+	stream := result[0]
 
-	for _, stream := range result {
-		params := make([]db.BatchCopyMessagesParams, 0, len(stream.Messages))
-		msgIDs := make([]string, 0, len(stream.Messages))
-		msgs := make([]*db.Message, 0, len(stream.Messages))
+	params := make([]db.BatchCopyMessagesParams, 0, BatchReadSize)
+	msgIDs := make([]string, 0, BatchReadSize)
+	msgs := make([]*db.Message, 0, BatchReadSize)
 
-		for _, msg := range stream.Messages {
-			msgIDs = append(msgIDs, msg.ID)
-			data, ok := msg.Values["data"].(string)
-			if !ok {
-				continue
-			}
-			var chatMsg db.Message
-			if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
-				log.Error().Err(err).Msg("worker unmarshal failed")
-				continue
-			}
-			msgs = append(msgs, &chatMsg)
-			params = append(params, db.BatchCopyMessagesParams{
-				MsgID:        chatMsg.MsgID,
-				ClientMsgID:  chatMsg.ClientMsgID,
-				SenderID:     chatMsg.SenderID,
-				ReceiverID:   chatMsg.ReceiverID,
-				ChatType:     chatMsg.ChatType,
-				MsgType:      chatMsg.MsgType,
-				ServerTime:   chatMsg.ServerTime,
-				ReplyToMsgID: chatMsg.ReplyToMsgID,
-				Payload:      chatMsg.Payload,
-				Ext:          chatMsg.Ext,
-			})
-		}
-		_, err := s.queries.BatchCopyMessages(ctx, params)
-		if err != nil {
-			log.Error().Err(err).Msg("batch insert error")
-			return
-		}
-		if err := s.publishDeliverBatch(ctx, msgs); err != nil {
-			log.Error().Err(err).Msg("worker publish deliver batch failed")
+	for _, msg := range stream.Messages {
+		msgIDs = append(msgIDs, msg.ID)
+		data, ok := msg.Values["data"].(string)
+		if !ok {
 			continue
 		}
-		s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
-
+		var chatMsg db.Message
+		if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
+			log.Error().Err(err).Msg("worker unmarshal failed")
+			continue
+		}
+		msgs = append(msgs, &chatMsg)
+		params = append(params, db.BatchCopyMessagesParams{
+			MsgID:        chatMsg.MsgID,
+			ClientMsgID:  chatMsg.ClientMsgID,
+			SenderID:     chatMsg.SenderID,
+			ReceiverID:   chatMsg.ReceiverID,
+			ChatType:     chatMsg.ChatType,
+			MsgType:      chatMsg.MsgType,
+			ServerTime:   chatMsg.ServerTime,
+			ReplyToMsgID: chatMsg.ReplyToMsgID,
+			Payload:      chatMsg.Payload,
+			Ext:          chatMsg.Ext,
+		})
 	}
+	_, err = s.queries.BatchCopyMessages(ctx, params)
+	if err != nil {
+		log.Error().Err(err).Msg("batch insert error")
+		return
+	}
+	if err := s.publishDeliverBatch(ctx, msgs); err != nil {
+		log.Error().Err(err).Msg("worker publish deliver batch failed")
+		return
+	}
+	s.redis.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
+
 }
 
 func (s *Service) publishDeliverBatch(ctx context.Context, msgs []*db.Message) error {
