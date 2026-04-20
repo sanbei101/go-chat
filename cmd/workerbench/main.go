@@ -58,67 +58,65 @@ func processBatch(ctx context.Context, rdb *redis.Client, queries *db.Queries, c
 		}
 		return
 	}
+	stream := result[0]
+	params := make([]db.BatchCopyMessagesParams, 0, len(stream.Messages))
+	msgIDs := make([]string, 0, len(stream.Messages))
+	msgs := make([]*db.Message, 0, len(stream.Messages))
 
-	for _, stream := range result {
-		params := make([]db.BatchCopyMessagesParams, 0, len(stream.Messages))
-		msgIDs := make([]string, 0, len(stream.Messages))
-		msgs := make([]*db.Message, 0, len(stream.Messages))
+	for _, msg := range stream.Messages {
+		msgIDs = append(msgIDs, msg.ID)
+		data, ok := msg.Values["data"].(string)
+		if !ok {
+			continue
+		}
+		var chatMsg db.Message
+		if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
+			log.Error().Err(err).Msg("unmarshal failed")
+			continue
+		}
+		msgs = append(msgs, &chatMsg)
+		params = append(params, db.BatchCopyMessagesParams{
+			MsgID:        chatMsg.MsgID,
+			ClientMsgID:  chatMsg.ClientMsgID,
+			SenderID:     chatMsg.SenderID,
+			ReceiverID:   chatMsg.ReceiverID,
+			ChatType:     chatMsg.ChatType,
+			MsgType:      chatMsg.MsgType,
+			ServerTime:   chatMsg.ServerTime,
+			ReplyToMsgID: chatMsg.ReplyToMsgID,
+			Payload:      chatMsg.Payload,
+			Ext:          chatMsg.Ext,
+		})
+	}
 
-		for _, msg := range stream.Messages {
-			msgIDs = append(msgIDs, msg.ID)
-			data, ok := msg.Values["data"].(string)
-			if !ok {
-				continue
-			}
-			var chatMsg db.Message
-			if err := json.Unmarshal([]byte(data), &chatMsg); err != nil {
-				log.Error().Err(err).Msg("unmarshal failed")
-				continue
-			}
-			msgs = append(msgs, &chatMsg)
-			params = append(params, db.BatchCopyMessagesParams{
-				MsgID:        chatMsg.MsgID,
-				ClientMsgID:  chatMsg.ClientMsgID,
-				SenderID:     chatMsg.SenderID,
-				ReceiverID:   chatMsg.ReceiverID,
-				ChatType:     chatMsg.ChatType,
-				MsgType:      chatMsg.MsgType,
-				ServerTime:   chatMsg.ServerTime,
-				ReplyToMsgID: chatMsg.ReplyToMsgID,
-				Payload:      chatMsg.Payload,
-				Ext:          chatMsg.Ext,
+	if len(params) > 0 {
+		_, err := queries.BatchCopyMessages(ctx, params)
+		if err != nil {
+			log.Error().Err(err).Msg("batch insert error")
+			errorCount.Add(int64(len(params)))
+			return
+		}
+
+		// Publish to messages:deliver
+		pipe := rdb.Pipeline()
+		for _, msg := range msgs {
+			bin, _ := json.Marshal(msg)
+			pipe.XAdd(ctx, &redis.XAddArgs{
+				Stream: "messages:deliver",
+				MaxLen: 100000,
+				Approx: true,
+				Values: map[string]any{"data": string(bin)},
 			})
 		}
-
-		if len(params) > 0 {
-			_, err := queries.BatchCopyMessages(ctx, params)
-			if err != nil {
-				log.Error().Err(err).Msg("batch insert error")
-				errorCount.Add(int64(len(params)))
-				return
-			}
-
-			// Publish to messages:deliver
-			pipe := rdb.Pipeline()
-			for _, msg := range msgs {
-				bin, _ := json.Marshal(msg)
-				pipe.XAdd(ctx, &redis.XAddArgs{
-					Stream: "messages:deliver",
-					MaxLen: 100000,
-					Approx: true,
-					Values: map[string]any{"data": string(bin)},
-				})
-			}
-			if _, err := pipe.Exec(ctx); err != nil {
-				log.Error().Err(err).Msg("publish to deliver failed")
-				errorCount.Add(int64(len(msgs)))
-				return
-			}
-
-			// Ack messages
-			rdb.XAck(ctx, "messages:inbound", "worker_group_bench", msgIDs...)
-			processedCount.Add(int64(len(msgs)))
+		if _, err := pipe.Exec(ctx); err != nil {
+			log.Error().Err(err).Msg("publish to deliver failed")
+			errorCount.Add(int64(len(msgs)))
+			return
 		}
+
+		// Ack messages
+		rdb.XAck(ctx, "messages:inbound", "worker_group_bench", msgIDs...)
+		processedCount.Add(int64(len(msgs)))
 	}
 }
 
