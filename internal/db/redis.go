@@ -32,6 +32,7 @@ const (
 	MessageSteamDeliver = "message:deliver"
 	MessageWorkerGroup  = "worker_group"
 	MessageGatewayGroup = "gateway_group"
+	MessageMaxLen       = 1000000
 )
 
 type Redis struct {
@@ -139,7 +140,7 @@ func (r *Redis) pushMessageToStream(ctx context.Context, stream string, messages
 		}
 		pipe.XAdd(ctx, &redis.XAddArgs{
 			Stream: stream,
-			MaxLen: 100000,
+			MaxLen: MessageMaxLen,
 			Approx: true,
 			Values: map[string]any{"data": bin},
 		})
