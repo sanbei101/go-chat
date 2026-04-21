@@ -79,6 +79,14 @@ func (r *Redis) GatewayPushMessage(ctx context.Context, messages []*Message) err
 	return r.pushMessageToStream(ctx, MessageSteamInbound, messages)
 }
 
+func (r *Redis) WorkerAckMessage(ctx context.Context, ids ...string) error {
+	return r.ackMessages(ctx, MessageSteamInbound, MessageWorkerGroup, ids...)
+}
+
+func (r *Redis) GatewayAckMessage(ctx context.Context, ids ...string) error {
+	return r.ackMessages(ctx, MessageSteamDeliver, MessageGatewayGroup, ids...)
+}
+
 func (r *Redis) pullMessageFromStream(ctx context.Context, stream, group, consumer string, batch int64) ([]*StreamMessage, error) {
 	result, err := r.client.XReadGroup(ctx, &redis.XReadGroupArgs{
 		Group:    group,
@@ -140,7 +148,7 @@ func (r *Redis) pushMessageToStream(ctx context.Context, stream string, messages
 	return err
 }
 
-func (r *Redis) AckMessages(ctx context.Context, stream, group string, ids ...string) error {
+func (r *Redis) ackMessages(ctx context.Context, stream, group string, ids ...string) error {
 	if len(ids) == 0 {
 		return nil
 	}

@@ -156,7 +156,7 @@ func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
 				receiverID := msg.Data.ReceiverID.String()
 				g.deliverToClient(receiverID, bin)
 			}
-			err = g.redis.AckMessages(ctx, db.MessageSteamDeliver, db.MessageGatewayGroup, msgIDs...)
+			err = g.redis.GatewayAckMessage(ctx, msgIDs...)
 			if err != nil {
 				log.Error().Err(err).Msg("gateway ack messages failed")
 			}

@@ -99,7 +99,7 @@ func (s *Service) processInbound(ctx context.Context) {
 		return
 	}
 
-	if err := s.redis.AckMessages(ctx, db.MessageSteamInbound, db.MessageWorkerGroup, msgIDs...); err != nil {
+	if err := s.redis.WorkerAckMessage(ctx, msgIDs...); err != nil {
 		log.Error().Err(err).Msg("worker ack messages failed")
 	}
 }

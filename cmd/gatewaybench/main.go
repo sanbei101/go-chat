@@ -17,7 +17,6 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/phuslu/log"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/internal/gateway"
@@ -36,44 +35,29 @@ var (
 	errCount      atomic.Int64
 )
 
-func startMockWorker(rdb *redis.Client) {
+func startMockWorker(rdb *db.Redis) {
 	ctx := context.Background()
-	rdb.XGroupCreateMkStream(ctx, "messages:inbound", "worker_group", "0")
+	rdb.InitStreamGroups(ctx)
 	for {
-		res, err := rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
-			Group:    "worker_group",
-			Consumer: "worker1",
-			Streams:  []string{"messages:inbound", ">"},
-			Count:    100,
-			Block:    time.Second,
-		}).Result()
-
-		if err != nil || len(res) == 0 {
+		msgs, err := rdb.WorkerPullMessage(ctx, 100)
+		if err != nil || len(msgs) == 0 {
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-
-		pipe := rdb.Pipeline()
 		var msgIDs []string
-		for _, msg := range res[0].Messages {
+		var messages []*db.Message
+		for _, msg := range msgs {
 			msgIDs = append(msgIDs, msg.ID)
-			pipe.XAdd(ctx, &redis.XAddArgs{
-				Stream: "messages:deliver",
-				Values: map[string]any{"data": msg.Values["data"]},
-			})
+			messages = append(messages, msg.Data)
 		}
-		pipe.XAck(ctx, "messages:inbound", "worker_group", msgIDs...)
-		pipe.Exec(ctx)
+		rdb.WorkerPushMessage(ctx, messages)
+		rdb.WorkerAckMessage(ctx, msgIDs...)
 	}
-
 }
 
 func main() {
 	cfg := config.NewTest()
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	})
+	rdb := db.NewRedis(cfg)
 
 	gw := gateway.New(cfg)
 	go gw.HandleWorkerMessages(context.Background())
