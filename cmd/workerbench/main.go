@@ -24,7 +24,6 @@ var (
 
 const (
 	MessageCount = 500000
-	WorkerCount  = 10
 	BatchSize    = 10000
 )
 
@@ -68,14 +67,20 @@ func main() {
 	redis.GatewayPushMessage(ctx, msgs)
 	fmt.Printf("Pre-populated %d messages in %v\n", MessageCount, time.Since(prepopulateStart))
 	go func() {
-		err := woker.ProcessInbound(ctx, BatchSize)
-		if err != nil {
-			log.Error().Err(err).Msg("worker process inbound failed")
-			errorCount.Add(BatchSize)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				err := woker.ProcessInbound(ctx, BatchSize)
+				if err != nil {
+					log.Error().Err(err).Msg("worker process inbound failed")
+					errorCount.Add(BatchSize)
+				}
+				processedCount.Add(BatchSize)
+			}
 		}
-		processedCount.Add(BatchSize)
 	}()
-
 	fmt.Println("Waiting for processing to complete...")
 	startTime := time.Now()
 	ticker := time.NewTicker(time.Second)
@@ -116,5 +121,5 @@ func main() {
 	fmt.Printf("Processed: %d\n", processedCount.Load())
 	fmt.Printf("Errors: %d\n", errorCount.Load())
 	fmt.Printf("Elapsed: %v\n", elapsed)
-	fmt.Printf("Worker Bench: %d messages, %d workers, batch size %d\n", MessageCount, WorkerCount, BatchSize)
+	fmt.Printf("Worker Bench: %d messages, batch size %d\n", MessageCount, BatchSize)
 }
