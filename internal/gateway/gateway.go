@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json/v2"
-	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -12,25 +11,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/phuslu/log"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/jwt"
 )
 
-const (
-	StreamConsumeFromBeginning = "0"
-	StreamConsumeFromNewOnly   = "$"
-	batchQueueSize             = 10000
-	batchFlushInterval         = 10 * time.Millisecond
-)
-
 type Gateway struct {
 	mu     sync.RWMutex
 	conns  map[string]map[*client]struct{}
-	redis  *redis.Client
+	redis  *db.Redis
 	config *config.Config
-	batch  chan []byte
 }
 
 type client struct {
@@ -48,57 +38,11 @@ func (c *client) writePump(ctx context.Context) {
 
 func New(config *config.Config) *Gateway {
 	g := &Gateway{
-		conns: map[string]map[*client]struct{}{},
-		redis: redis.NewClient(&redis.Options{
-			Addr:     config.Redis.Addr,
-			Password: config.Redis.Password,
-			DB:       config.Redis.DB,
-		}),
+		conns:  map[string]map[*client]struct{}{},
+		redis:  db.NewRedis(config),
 		config: config,
-		batch:  make(chan []byte, batchQueueSize*10),
 	}
-	go g.batchFlushLoop()
 	return g
-}
-
-func (g *Gateway) batchFlushLoop() {
-	ticker := time.NewTicker(batchFlushInterval)
-	defer ticker.Stop()
-	buf := make([][]byte, 0, batchQueueSize)
-	for {
-		select {
-		case msg := <-g.batch:
-			buf = append(buf, msg)
-			if len(buf) >= batchQueueSize {
-				g.flushBatch(buf)
-				buf = buf[:0]
-			}
-		case <-ticker.C:
-			if len(buf) > 0 {
-				g.flushBatch(buf)
-				buf = buf[:0]
-			}
-		}
-	}
-}
-
-func (g *Gateway) flushBatch(msgs [][]byte) {
-	if len(msgs) == 0 {
-		return
-	}
-	ctx := context.Background()
-	pipe := g.redis.Pipeline()
-	for _, bin := range msgs {
-		pipe.XAdd(ctx, &redis.XAddArgs{
-			Stream: "messages:inbound",
-			MaxLen: 100000,
-			Approx: true,
-			Values: map[string]any{"data": string(bin)},
-		})
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
-		log.Error().Err(err).Int("count", len(msgs)).Msg("gateway batch flush failed")
-	}
 }
 
 func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
@@ -190,26 +134,15 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		message.SenderID = senderUUID
 		message.ServerTime = time.Now().UnixMicro()
-		bin, err := json.Marshal(message)
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Msg("gateway marshal message failed")
-			continue
-		}
-		select {
-		case g.batch <- bin:
-		default:
-			log.Warn().Str("user_id", userID).Msg("gateway batch queue full, dropping message")
+
+		if err := g.redis.GatewayPushMessage(r.Context(), []*db.Message{&message}); err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("gateway push message failed")
 		}
 	}
 }
 
 func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
-	err := g.redis.XGroupCreateMkStream(ctx,
-		"messages:deliver",
-		"gateway_group",
-		StreamConsumeFromBeginning,
-	).Err()
-	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+	if err := g.redis.InitStreamGroups(ctx); err != nil {
 		log.Warn().Err(err).Msg("gateway consumer group mkstream failed")
 	}
 
@@ -218,44 +151,35 @@ func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			result, err := g.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
-				Group:    "gateway_group",
-				Consumer: "gateway1",
-				Streams:  []string{"messages:deliver", ">"},
-				Count:    1000,
-				Block:    time.Second,
-				NoAck:    false,
-			}).Result()
+			messages, err := g.redis.GatewayPullMessage(ctx, 1000)
 			if err != nil {
-				if errors.Is(err, redis.Nil) {
-					continue
-				}
 				if ctx.Err() != nil {
 					return
 				}
-				log.Error().Err(err).Msg("gateway xread failed")
+				log.Error().Err(err).Msg("gateway pull message failed")
 				time.Sleep(time.Second)
 				continue
 			}
-			for _, stream := range result {
-				var msgIDs []string
-				for _, msg := range stream.Messages {
-					msgIDs = append(msgIDs, msg.ID)
-					data, ok := msg.Values["data"].(string)
-					if !ok {
-						continue
-					}
-					var message db.Message
-					if err := json.Unmarshal([]byte(data), &message); err != nil {
-						log.Error().Err(err).Msg("gateway unmarshal message failed")
-						continue
-					}
-					receiverID := message.ReceiverID.String()
-					g.deliverToClient(receiverID, []byte(data))
+
+			if len(messages) == 0 {
+				continue
+			}
+
+			var msgIDs []string
+			for _, msg := range messages {
+				msgIDs = append(msgIDs, msg.ID)
+
+				bin, marshalErr := json.Marshal(msg.Data)
+				if marshalErr != nil {
+					log.Error().Err(marshalErr).Msg("gateway marshal message failed")
+					continue
 				}
-				if len(msgIDs) > 0 {
-					g.redis.XAck(ctx, "messages:deliver", "gateway_group", msgIDs...)
-				}
+				receiverID := msg.Data.ReceiverID.String()
+				g.deliverToClient(receiverID, bin)
+			}
+			err = g.redis.AckMessages(ctx, db.MessageSteamDeliver, db.MessageGatewayGroup, msgIDs...)
+			if err != nil {
+				log.Error().Err(err).Msg("gateway ack messages failed")
 			}
 		}
 	}

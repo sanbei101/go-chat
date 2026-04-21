@@ -38,11 +38,11 @@ type Redis struct {
 	client *redis.Client
 }
 
-func NewRedis(conf *config.RedisConfig) *Redis {
+func NewRedis(conf *config.Config) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     conf.Addr,
-		Password: conf.Password,
-		DB:       conf.DB,
+		Addr:     conf.Redis.Addr,
+		Password: conf.Redis.Password,
+		DB:       conf.Redis.DB,
 		PoolSize: 50,
 	})
 
@@ -133,7 +133,7 @@ func (r *Redis) pushMessageToStream(ctx context.Context, stream string, messages
 			Stream: stream,
 			MaxLen: 100000,
 			Approx: true,
-			Values: map[string]any{"data": string(bin)},
+			Values: map[string]any{"data": bin},
 		})
 	}
 	_, err := pipe.Exec(ctx)
