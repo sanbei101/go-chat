@@ -17,34 +17,17 @@ import (
 )
 
 type Gateway struct {
-	mu     sync.RWMutex
-	conns  map[string]map[*client]struct{}
-	redis  *db.Redis
-	config *config.Config
-}
-
-type client struct {
-	conn *websocket.Conn
-	send chan []byte
-}
-
-func (c *client) writePump(ctx context.Context) {
-	for msg := range c.send {
-		if err := c.conn.Write(ctx, websocket.MessageText, msg); err != nil {
-			return
-		}
-	}
+	sessions sync.Map
+	redis    *db.Redis
+	config   *config.Config
 }
 
 func New(config *config.Config) *Gateway {
-	g := &Gateway{
-		conns:  map[string]map[*client]struct{}{},
+	return &Gateway{
 		redis:  db.NewRedis(config),
 		config: config,
 	}
-	return g
 }
-
 func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 	jwtToken := r.Header.Get("Authorization")
 	if jwtToken == "" {
@@ -72,20 +55,16 @@ func (g *Gateway) HandleUserMessage(w http.ResponseWriter, r *http.Request) {
 		conn: conn,
 		send: make(chan []byte, 100),
 	}
-	g.mu.Lock()
-	if g.conns[userID] == nil {
-		g.conns[userID] = map[*client]struct{}{}
-	}
-	g.conns[userID][c] = struct{}{}
-	g.mu.Unlock()
+	sessionIface, _ := g.sessions.LoadOrStore(userID, NewUserSession())
+	session := sessionIface.(*UserSession)
+	session.Add(c)
 
+	// 注册退出清理逻辑
 	defer func() {
-		g.mu.Lock()
-		delete(g.conns[userID], c)
-		if len(g.conns[userID]) == 0 {
-			delete(g.conns, userID)
+		// 如果 Remove 返回 true,说明该用户的所有设备都已断开,清理 sync.Map 中的记录
+		if session.Remove(c) {
+			g.sessions.Delete(userID)
 		}
-		g.mu.Unlock()
 		close(c.send)
 	}()
 
@@ -186,14 +165,10 @@ func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
 }
 
 func (g *Gateway) deliverToClient(userID string, payload []byte) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	for c := range g.conns[userID] {
-		select {
-		case c.send <- payload:
-		default:
-			log.Warn().Str("user_id", userID).Msg("gateway client buffer full, dropping message")
-		}
+	if sessionIface, ok := g.sessions.Load(userID); ok {
+		session := sessionIface.(*UserSession)
+		session.Broadcast(payload)
+	} else {
+		log.Debug().Str("user_id", userID).Msg("user not connected to this gateway instance")
 	}
 }
