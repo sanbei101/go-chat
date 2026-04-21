@@ -24,7 +24,7 @@ var (
 
 const (
 	MessageCount  = 500000
-	BatchSize     = 500
+	BatchSize     = 10000
 	pushBatchSize = 10000
 )
 
