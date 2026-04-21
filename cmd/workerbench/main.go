@@ -33,6 +33,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	redis := db.NewRedis(cfg)
+	redis.InitStreamGroups(ctx)
 	woker := worker.New(cfg)
 	cpuFile, err := os.Create("cpu.prof")
 	if err != nil {
