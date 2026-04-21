@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phuslu/log"
@@ -18,10 +19,9 @@ const (
 type Service struct {
 	redis   *db.Redis
 	queries *db.Queries
-	pool    *pgxpool.Pool
 }
 
-func New(cfg *config.Config, redisClient *db.Redis) *Service {
+func New(cfg *config.Config) *Service {
 	pool, err := pgxpool.New(context.Background(), cfg.Postgres.DSN)
 	if err != nil {
 		log.Fatal().Err(err).Msg("worker connect postgres failed")
@@ -30,9 +30,8 @@ func New(cfg *config.Config, redisClient *db.Redis) *Service {
 		log.Fatal().Err(err).Msg("worker ping postgres failed")
 	}
 	return &Service{
-		redis:   redisClient,
+		redis:   db.NewRedis(cfg),
 		queries: db.New(pool),
-		pool:    pool,
 	}
 }
 
@@ -43,31 +42,32 @@ func (s *Service) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.pool.Close()
 			return
 		default:
-			s.processInbound(ctx)
+			err := s.ProcessInbound(ctx, BatchReadSize)
+			if err != nil {
+				log.Error().Err(err).Msg("worker process inbound failed")
+			}
 		}
 	}
 }
 
-func (s *Service) processInbound(ctx context.Context) {
-	streamMsgs, err := s.redis.WorkerPullMessage(ctx, BatchReadSize)
+func (s *Service) ProcessInbound(ctx context.Context, batchSize int64) error {
+	streamMsgs, err := s.redis.WorkerPullMessage(ctx, batchSize)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			log.Info().Msg("worker 收到退出信号，停止读取消息")
-			return
+			log.Info().Msg("worker 收到退出信号,停止读取消息")
+			return nil
 		}
-		log.Error().Err(err).Msg("worker xread读取失败")
-		return
+		return fmt.Errorf("worker xread failed: %w", err)
 	}
 	if len(streamMsgs) == 0 {
-		return
+		return nil
 	}
 
-	params := make([]db.BatchCopyMessagesParams, 0, len(streamMsgs))
-	msgIDs := make([]string, 0, len(streamMsgs))
-	msgs := make([]*db.Message, 0, len(streamMsgs))
+	params := make([]db.BatchCopyMessagesParams, 0, batchSize)
+	msgIDs := make([]string, 0, batchSize)
+	msgs := make([]*db.Message, 0, batchSize)
 
 	for _, sm := range streamMsgs {
 		msgIDs = append(msgIDs, sm.ID)
@@ -90,16 +90,15 @@ func (s *Service) processInbound(ctx context.Context) {
 
 	_, err = s.queries.BatchCopyMessages(ctx, params)
 	if err != nil {
-		log.Error().Err(err).Msg("batch insert error")
-		return
+		return fmt.Errorf("batch copy messages failed: %w", err)
 	}
 
 	if err := s.redis.WorkerPushMessage(ctx, msgs); err != nil {
-		log.Error().Err(err).Msg("worker publish deliver batch failed")
-		return
+		return fmt.Errorf("worker publish deliver batch failed: %w", err)
 	}
 
 	if err := s.redis.WorkerAckMessage(ctx, msgIDs...); err != nil {
-		log.Error().Err(err).Msg("worker ack messages failed")
+		return fmt.Errorf("worker ack messages failed: %w", err)
 	}
+	return nil
 }

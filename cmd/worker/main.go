@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sanbei101/im/internal/db"
 	"github.com/sanbei101/im/internal/worker"
 	"github.com/sanbei101/im/pkg/config"
 	"github.com/sanbei101/im/pkg/logger"
@@ -14,10 +13,7 @@ import (
 func main() {
 	logger.InitLogger()
 	cfg := config.New()
-
-	redisClient := db.NewRedis(cfg)
-
-	svc := worker.New(cfg, redisClient)
+	svc := worker.New(cfg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
