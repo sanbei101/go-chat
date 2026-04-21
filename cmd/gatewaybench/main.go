@@ -37,7 +37,6 @@ var (
 
 func startMockWorker(rdb *db.Redis) {
 	ctx := context.Background()
-	rdb.InitStreamGroups(ctx)
 	for {
 		msgs, err := rdb.WorkerPullMessage(ctx, 100)
 		if err != nil || len(msgs) == 0 {
@@ -58,6 +57,7 @@ func startMockWorker(rdb *db.Redis) {
 func main() {
 	cfg := config.NewTest()
 	rdb := db.NewRedis(cfg)
+	rdb.InitStreamGroups(context.Background())
 
 	gw := gateway.New(cfg)
 	go gw.HandleWorkerMessages(context.Background())

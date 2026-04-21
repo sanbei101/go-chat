@@ -23,8 +23,9 @@ var (
 )
 
 const (
-	MessageCount = 500000
-	BatchSize    = 10000
+	MessageCount  = 500000
+	BatchSize     = 500
+	pushBatchSize = 10000
 )
 
 func main() {
@@ -47,7 +48,7 @@ func main() {
 
 	fmt.Println("Pre-populating messages:inbound stream...")
 	prepopulateStart := time.Now()
-	msgs := make([]*db.Message, 0, MessageCount)
+	msgs := make([]*db.Message, 0, pushBatchSize)
 	for i := range MessageCount {
 		msgID, _ := uuid.NewV7()
 		clientID, _ := uuid.NewV7()
@@ -64,8 +65,15 @@ func main() {
 			Payload:     jsontext.Value(fmt.Sprintf(`{"text": "bench message %d"}`, i)),
 		}
 		msgs = append(msgs, &msg)
+
+		if len(msgs) >= pushBatchSize {
+			redis.GatewayPushMessage(ctx, msgs)
+			msgs = msgs[:0]
+		}
 	}
-	redis.GatewayPushMessage(ctx, msgs)
+	if len(msgs) > 0 {
+		redis.GatewayPushMessage(ctx, msgs)
+	}
 	fmt.Printf("Pre-populated %d messages in %v\n", MessageCount, time.Since(prepopulateStart))
 	go func() {
 		for {
