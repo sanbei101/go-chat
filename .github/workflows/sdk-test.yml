@@ -40,3 +40,5 @@ jobs:
         env:
           API_BASE_URL: http://localhost:8801
           WS_GATEWAY_URL: ws://localhost:8800/ws
+          NO_COLOR: "1"
+          FORCE_COLOR: "0"
