@@ -1,11 +1,13 @@
 /**
  * 测试配置 - 指向远程测试服务器
  */
+const getEnv = (key: string, defaultValue: string): string => {
+  return process.env[key] || defaultValue;
+};
+
 export const TEST_CONFIG = {
-  /** API 基础 URL */
-  baseURL: 'http://154.8.213.38:8801',
-  /** WebSocket 网关 URL */
-  gatewayURL: 'ws://154.8.213.38:8800/ws',
+  baseURL: getEnv('API_BASE_URL', 'http://154.8.213.38:8801'),
+  gatewayURL: getEnv('WS_GATEWAY_URL', 'ws://154.8.213.38:8800/ws'),
 } as const;
 
 /**

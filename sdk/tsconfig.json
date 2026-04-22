@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
+    "types": ["node"],
     "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM"],
     "declaration": true,
@@ -19,7 +20,7 @@
     "rootDir": "."
   },
   "include": [
-    "*.ts"
+    "**/*.ts"
   ],
   "exclude": [
     "node_modules",
