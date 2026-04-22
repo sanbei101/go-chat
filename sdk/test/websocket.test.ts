@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ChatSDK, ChatType, MessageType, ChatEventType, ConnectionState } from '../index';
+import { ChatSDK, ChatEventType, ConnectionState } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('WebSocket 连接集成测试', () => {
@@ -51,7 +51,7 @@ describe('WebSocket 连接集成测试', () => {
   it('应该触发 connect 事件', async () => {
     let connected = false;
 
-    const unsubscribe = sdk.on(ChatEventType.Connect, (event) => {
+    const unsubscribe = sdk.on(ChatEventType.Connect, (_event) => {
       connected = true;
       console.log('收到 connect 事件');
     });

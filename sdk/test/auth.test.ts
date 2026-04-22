@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ChatSDK, ChatType, MessageType, ChatEventType, ConnectionState } from '../index';
-import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
+import { ChatSDK } from '../index';
+import { TEST_CONFIG, randomUsername, randomPassword } from './setup';
 
 describe('用户认证 API 集成测试', () => {
   let sdk: ChatSDK;
@@ -60,8 +60,9 @@ describe('用户认证 API 集成测试', () => {
     const username = randomUsername();
     const password = randomPassword();
 
+    // 先注册用户
     const registerResult = await sdk.register({ username, password });
-    const firstToken = registerResult.token;
+    expect(registerResult.token).toBeDefined();
 
     // 清除并重新登录
     sdk.clearAuth();

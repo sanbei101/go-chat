@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ChatSDK, ChatType, MessageType, ChatEventType, ConnectionState } from '../index';
+import { ChatSDK, ChatType, ChatEventType, ConnectionState } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('重连机制集成测试', () => {
   let sdk: ChatSDK;
-  let reconnectCount = 0;
 
   beforeAll(async () => {
     sdk = new ChatSDK({
@@ -50,15 +49,7 @@ describe('重连机制集成测试', () => {
   it('应该触发错误事件', async () => {
     const errors: { code: string; message: string }[] = [];
 
-    const unsubscribe = sdk.on(ChatEventType.Error, (event) => {
-      errors.push({
-        code: event.data.code,
-        message: event.data.message,
-      });
-      console.log('收到错误事件:', event.data.code, event.data.message);
-    });
-
-    // 创建一个无法连接的实例（错误的 URL）
+    // 创建一个无法连接的实例
     const badSdk = new ChatSDK({
       baseURL: TEST_CONFIG.baseURL,
       gatewayURL: 'ws://invalid-server:9999/ws', // 无效的服务器
@@ -66,16 +57,27 @@ describe('重连机制集成测试', () => {
       maxReconnectAttempts: 2,
     });
 
+    // 先注册用户
     await badSdk.register({
       username: randomUsername(),
       password: randomPassword(),
     });
 
-    // 尝试连接（应该失败）
+    // 订阅错误事件
+    const unsubscribe = badSdk.on(ChatEventType.Error, (event) => {
+      errors.push({
+        code: event.data.code,
+        message: event.data.message,
+      });
+      console.log('收到错误事件:', event.data.code, event.data.message);
+    });
+
+    // 尝试连接
     try {
       await badSdk.connect();
     } catch (error) {
       // 预期会失败
+      console.log('连接失败:', error);
     }
 
     await sleep(3000); // 等待重连尝试
@@ -109,7 +111,7 @@ describe('错误处理集成测试', () => {
       });
     });
 
-    // 不连接就发送消息（消息会被加入队列，同时触发错误）
+    // 不连接就发送消息(消息会被加入队列,同时触发错误)
     sdk.sendTextMessage({
       receiver_id: 'test-user-id',
       chat_type: ChatType.Single,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ChatSDK, ChatType, MessageType, ChatEventType, ConnectionState } from '../index';
+import { ChatSDK, ChatType, MessageType, ChatEventType } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('消息发送与接收集成测试', () => {
@@ -216,8 +216,6 @@ describe('消息发送与接收集成测试', () => {
 
     // 注意：当前实现在未连接时会将消息加入队列而不是报错
     // 这里测试的是消息被队列化的情况
-    const clientMsgId = disconnectedSdk.generateMessageId();
-
     // 不应该抛出错误（消息会被缓存）
     expect(() => {
       disconnectedSdk.sendTextMessage({

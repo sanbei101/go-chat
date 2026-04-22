@@ -7,6 +7,7 @@ import type {
 } from './types';
 import { ChatEventType, ConnectionState as State } from './types';
 import { EventEmitter, createError, createStateChange } from './utils';
+import WebSocket from 'ws';
 
 /**
  * WebSocket 连接管理器
@@ -90,9 +91,12 @@ export class WebSocketManager {
 
     try {
       const wsUrl = new URL(this.options.gatewayURL);
-      wsUrl.searchParams.append('token', this.token);
 
-      this.ws = new WebSocket(wsUrl.toString());
+      this.ws = new WebSocket(wsUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+        },
+      });
 
       await this.setupWebSocketHandlers();
     } catch (error) {
@@ -126,7 +130,7 @@ export class WebSocketManager {
 
     this.reconnectAttempts = 0;
     this.setState(State.Disconnected);
-    this.emitter.emit(ChatEventType.Disconnect, undefined);
+    this.emitter.emit(ChatEventType.Disconnect, { code: 1000, reason: 'Client disconnect' });
   }
 
   /**
@@ -176,7 +180,7 @@ export class WebSocketManager {
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
         this.setState(State.Connected);
-        this.emitter.emit(ChatEventType.Connect, undefined);
+        this.emitter.emit(ChatEventType.Connect, { timestamp: Date.now() });
         this.startHeartbeat();
         this.flushMessageQueue();
         resolve();
@@ -184,7 +188,8 @@ export class WebSocketManager {
 
       // 接收消息
       this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
+        const data = typeof event.data === 'string' ? event.data : event.data.toString();
+        this.handleMessage(data);
       };
 
       // 连接关闭
@@ -205,11 +210,12 @@ export class WebSocketManager {
 
       // 连接错误
       this.ws.onerror = (error) => {
+        const err = error as unknown as Error;
         this.emitter.emit(
           ChatEventType.Error,
-          createError('WS_ERROR', 'WebSocket error occurred', error instanceof Error ? error : undefined)
+          createError('WS_ERROR', err.message || 'WebSocket error occurred', err)
         );
-        reject(error);
+        reject(err);
       };
     });
   }

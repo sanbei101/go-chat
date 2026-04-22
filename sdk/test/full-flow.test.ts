@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ChatSDK, ChatType, ChatEventType, ConnectionState } from '../index';
+import { ChatSDK, ChatType, ChatEventType } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('SDK 完整流程集成测试', () => {
