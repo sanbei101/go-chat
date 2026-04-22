@@ -22,16 +22,18 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
+          cache-dependency-path: sdk/pnpm-lock.yaml
 
       - name: Set up Backend
         run: docker compose up -d
 
       - name: Install dependencies
+        working-directory: sdk
         run: pnpm install
           
       - name: Run SDK tests
+        working-directory: sdk
         run: |
-          cd sdk
           pnpm test &> test.log || true 
           
           echo "### 📄 Test Logs" >> $GITHUB_STEP_SUMMARY
