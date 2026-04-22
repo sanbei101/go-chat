@@ -1,9 +1,9 @@
 import type {
-  ConnectionState,
-  ChatEvent,
   ChatEventType,
   EventListener,
+  ChatEvent,
   ErrorData,
+  ConnectionState,
   ConnectionStateChangeData,
 } from './types';
 
@@ -11,16 +11,16 @@ import type {
  * 事件发射器 - 用于SDK内部事件管理
  */
 export class EventEmitter {
-  private listeners: Map<ChatEventType, Set<EventListener>> = new Map();
+  private listeners: Map<ChatEventType, Set<EventListener<ChatEventType>>> = new Map();
 
   /**
    * 监听事件
    */
-  on<T>(event: ChatEventType, listener: EventListener<T>): () => void {
+  on<T extends ChatEventType>(event: T, listener: EventListener<T>): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as EventListener);
+    this.listeners.get(event)!.add(listener as EventListener<ChatEventType>);
 
     // 返回取消订阅函数
     return () => {
@@ -31,21 +31,21 @@ export class EventEmitter {
   /**
    * 监听一次性事件
    */
-  once<T>(event: ChatEventType, listener: EventListener<T>): void {
+  once<T extends ChatEventType>(event: T, listener: EventListener<T>): void {
     const onceWrapper = (e: ChatEvent<T>) => {
-      this.off(event, onceWrapper as EventListener);
+      this.off(event, onceWrapper as EventListener<T>);
       listener(e);
     };
-    this.on(event, onceWrapper as EventListener);
+    this.on(event, onceWrapper as EventListener<T>);
   }
 
   /**
    * 取消监听
    */
-  off<T>(event: ChatEventType, listener: EventListener<T>): void {
+  off<T extends ChatEventType>(event: T, listener: EventListener<T>): void {
     const set = this.listeners.get(event);
     if (set) {
-      set.delete(listener as EventListener);
+      set.delete(listener as EventListener<ChatEventType>);
       if (set.size === 0) {
         this.listeners.delete(event);
       }
@@ -55,7 +55,7 @@ export class EventEmitter {
   /**
    * 触发事件
    */
-  emit<T>(event: ChatEventType, data: T): void {
+  emit<T extends ChatEventType>(event: T, data: ChatEvent<T>['data']): void {
     const set = this.listeners.get(event);
     if (set) {
       const eventObj: ChatEvent<T> = {
@@ -65,7 +65,7 @@ export class EventEmitter {
       };
       set.forEach((listener) => {
         try {
-          listener(eventObj);
+          listener(eventObj as ChatEvent<ChatEventType>);
         } catch (err) {
           console.error(`Event listener error for ${event}:`, err);
         }
@@ -97,12 +97,19 @@ export function generateUUID(): string {
 }
 
 /**
-   * 检查字符串是否为有效的UUID
-   */
+ * 检查字符串是否为有效的UUID
+ */
 export function isValidUUID(str: string): boolean {
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
+}
+
+/**
+ * 延迟函数
+ */
+export function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -131,43 +138,4 @@ export function createStateChange(
     state,
     previousState,
   };
-}
-
-/**
- * 延迟函数
- */
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * 重试函数
- */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  maxAttempts: number,
-  delayMs: number,
-  shouldRetry?: (error: Error) => boolean
-): Promise<T> {
-  let lastError: Error;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (attempt === maxAttempts) {
-        throw lastError;
-      }
-
-      if (shouldRetry && !shouldRetry(lastError)) {
-        throw lastError;
-      }
-
-      await delay(delayMs * attempt); // 指数退避
-    }
-  }
-
-  throw lastError!;
 }

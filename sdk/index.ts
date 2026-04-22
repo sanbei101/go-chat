@@ -49,7 +49,7 @@ export { WebSocketManager } from './websocket';
  * await sdk.connect();
  *
  * // 监听消息
- * sdk.on('message:received', (event) => {
+ * sdk.on(ChatEventType.MessageReceived, (event) => {
  *   console.log('收到消息:', event.data.message);
  * });
  *
@@ -89,23 +89,23 @@ export class ChatSDK {
   // ==================== 事件监听 ====================
 
   /**
-   * 监听事件
+   * 监听事件 - 类型安全的事件监听
    */
-  on<T>(event: ChatEventType, listener: EventListener<T>): () => void {
+  on<T extends ChatEventType>(event: T, listener: EventListener<T>): () => void {
     return this.emitter.on(event, listener);
   }
 
   /**
-   * 监听一次性事件
+   * 监听一次性事件 - 类型安全的事件监听
    */
-  once<T>(event: ChatEventType, listener: EventListener<T>): void {
+  once<T extends ChatEventType>(event: T, listener: EventListener<T>): void {
     this.emitter.once(event, listener);
   }
 
   /**
    * 取消监听
    */
-  off<T>(event: ChatEventType, listener: EventListener<T>): void {
+  off<T extends ChatEventType>(event: T, listener: EventListener<T>): void {
     this.emitter.off(event, listener);
   }
 
@@ -232,7 +232,7 @@ export class ChatSDK {
    * 发送文本消息
    */
   sendTextMessage(
-    params: Omit<SendMessageRequest, 'msg_type' | 'payload'> & { text: string }
+    params: Omit<SendMessageRequest, 'client_msg_id' | 'msg_type' | 'payload'> & { text: string }
   ): void {
     const { text, ...rest } = params;
     this.sendMessage({
@@ -246,7 +246,7 @@ export class ChatSDK {
    * 发送图片消息
    */
   sendImageMessage(
-    params: Omit<SendMessageRequest, 'msg_type' | 'payload'> & ImagePayload
+    params: Omit<SendMessageRequest, 'client_msg_id' | 'msg_type' | 'payload'> & ImagePayload
   ): void {
     const { url, width, height, size, ...rest } = params;
     this.sendMessage({
@@ -260,7 +260,7 @@ export class ChatSDK {
    * 发送视频消息
    */
   sendVideoMessage(
-    params: Omit<SendMessageRequest, 'msg_type' | 'payload'> & VideoPayload
+    params: Omit<SendMessageRequest, 'client_msg_id' | 'msg_type' | 'payload'> & VideoPayload
   ): void {
     const { url, duration, width, height, size, thumbnail_url, ...rest } =
       params;
@@ -275,7 +275,7 @@ export class ChatSDK {
    * 发送文件消息
    */
   sendFileMessage(
-    params: Omit<SendMessageRequest, 'msg_type' | 'payload'> & FilePayload
+    params: Omit<SendMessageRequest, 'client_msg_id' | 'msg_type' | 'payload'> & FilePayload
   ): void {
     const { url, name, size, mime_type, ...rest } = params;
     this.sendMessage({

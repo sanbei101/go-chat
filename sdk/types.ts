@@ -41,7 +41,7 @@ export interface Message {
 // 发送消息的请求结构(客户端需要构造的)
 export interface SendMessageRequest {
   /** 客户端生成的唯一消息ID */
-  client_msg_id: string;
+  client_msg_id?: string;
   /** 接收者ID */
   receiver_id: string;
   /** 聊天类型 */
@@ -154,13 +154,6 @@ export enum ChatEventType {
   Disconnect = 'disconnect',
 }
 
-// 聊天事件
-export interface ChatEvent<T = unknown> {
-  type: ChatEventType;
-  data: T;
-  timestamp: number;
-}
-
 // 消息接收事件数据
 export interface MessageReceivedData {
   message: Message;
@@ -169,8 +162,8 @@ export interface MessageReceivedData {
 // 消息发送成功事件数据
 export interface MessageSentData {
   client_msg_id: string;
-  server_msg_id: string;
-  server_time: number;
+  server_msg_id?: string;
+  server_time?: number;
 }
 
 // 连接状态变更事件数据
@@ -186,8 +179,38 @@ export interface ErrorData {
   originalError?: Error;
 }
 
+// 连接事件数据
+export interface ConnectData {
+  timestamp: number;
+}
+
+// 断开连接事件数据
+export interface DisconnectData {
+  code?: number;
+  reason?: string;
+}
+
+// 事件数据映射表 - 用于类型推导
+export interface ChatEventDataMap {
+  [ChatEventType.MessageReceived]: MessageReceivedData;
+  [ChatEventType.MessageSent]: MessageSentData;
+  [ChatEventType.ConnectionStateChange]: ConnectionStateChangeData;
+  [ChatEventType.Error]: ErrorData;
+  [ChatEventType.Connect]: ConnectData;
+  [ChatEventType.Disconnect]: DisconnectData;
+}
+
+// 聊天事件 - 使用映射表实现类型安全
+export type ChatEvent<T extends ChatEventType = ChatEventType> = {
+  type: T;
+  data: T extends keyof ChatEventDataMap ? ChatEventDataMap[T] : unknown;
+  timestamp: number;
+};
+
 // 事件监听器类型
-export type EventListener<T = unknown> = (event: ChatEvent<T>) => void;
+export type EventListener<T extends ChatEventType = ChatEventType> = (
+  event: ChatEvent<T>
+) => void;
 
 // 历史消息查询参数
 export interface HistoryQueryParams {
