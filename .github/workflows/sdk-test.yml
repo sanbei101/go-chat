@@ -14,6 +14,20 @@ jobs:
       
       - name: Set up Backend
         run: docker compose up -d
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v6
+        name: Install pnpm
+        with:
+          version: 10
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install
           
       - name: Run SDK tests
         run: |
