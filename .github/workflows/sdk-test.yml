@@ -16,13 +16,10 @@ jobs:
         name: Install pnpm
         with:
           version: 10
-          cache: true
       
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'pnpm'
-          cache-dependency-path: sdk/pnpm-lock.yaml
 
       - name: Set up Backend
         run: docker compose up -d
