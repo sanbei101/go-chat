@@ -66,7 +66,7 @@ describe('SDK 完整流程集成测试', () => {
     expect(userBMessages[0]).toBe('Hello from User A!');
     expect(userAMessages[0]).toBe('Hello from User B!');
 
-    console.log('消息双向发送成功！');
+    console.log('消息双向发送成功!');
 
     // 7. 断开连接
     console.log('=== 步骤6: 断开连接 ===');

@@ -33,8 +33,8 @@ describe('重连机制集成测试', () => {
       console.log('重连测试 - 状态变更:', event.data.state);
     });
 
-    // 模拟断连（强制关闭 WebSocket）
-    // 这里我们断开连接后，SDK 会自动尝试重连
+    // 模拟断连(强制关闭 WebSocket)
+    // 这里我们断开连接后,SDK 会自动尝试重连
     sdk.disconnect();
 
     // 等待一段时间观察重连行为

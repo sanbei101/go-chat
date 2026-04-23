@@ -59,7 +59,7 @@ describe('消息发送与接收集成测试', () => {
       text: testText,
     });
 
-    // 等待消息到达（最多5秒）
+    // 等待消息到达(最多5秒)
     let waited = 0;
     while (receivedMessages.length === 0 && waited < 5000) {
       await sleep(100);
@@ -214,9 +214,9 @@ describe('消息发送与接收集成测试', () => {
       password: randomPassword(),
     });
 
-    // 注意：当前实现在未连接时会将消息加入队列而不是报错
+    // 注意:当前实现在未连接时会将消息加入队列而不是报错
     // 这里测试的是消息被队列化的情况
-    // 不应该抛出错误（消息会被缓存）
+    // 不应该抛出错误(消息会被缓存)
     expect(() => {
       disconnectedSdk.sendTextMessage({
         receiver_id: user2Id,

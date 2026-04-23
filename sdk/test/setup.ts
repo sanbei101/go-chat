@@ -11,7 +11,7 @@ export const TEST_CONFIG = {
 } as const;
 
 /**
- * 生成随机用户名（用于测试）
+ * 生成随机用户名(用于测试)
  */
 export function randomUsername(): string {
   return `test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;

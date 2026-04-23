@@ -68,7 +68,7 @@ describe('用户认证 API 集成测试', () => {
     sdk.clearAuth();
     const loginResult = await sdk.login({ username, password });
 
-    // 注意：JWT token 每次生成都是新的，只要验证能获取到有效 token 即可
+    // 注意:JWT token 每次生成都是新的,只要验证能获取到有效 token 即可
     expect(loginResult.token).toBeDefined();
     expect(sdk.isAuthenticated()).toBe(true);
   });
