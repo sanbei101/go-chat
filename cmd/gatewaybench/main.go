@@ -75,12 +75,16 @@ func main() {
 		log.Error().Err(err).Msg("创建 CPU profile 文件失败")
 		return
 	}
-	defer cpuFile.Close()
 
 	if err := pprof.StartCPUProfile(cpuFile); err != nil {
 		log.Error().Err(err).Msg("启动 CPU profile 失败")
+		cpuFile.Close()
 		return
 	}
+	defer func() {
+		pprof.StopCPUProfile()
+		cpuFile.Close()
+	}()
 
 	fmt.Printf("正在生成 %d 个用户并建立连接...\n", UserCount)
 	var users []uuid.UUID

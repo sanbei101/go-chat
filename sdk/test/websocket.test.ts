@@ -1,19 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { ChatSDK, ChatEventType, ConnectionState } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('WebSocket 连接集成测试', () => {
+  afterEach(() => {
+    sdk?.disconnect();
+  });
+
   let sdk: ChatSDK;
 
   beforeAll(async () => {
     sdk = new ChatSDK(TEST_CONFIG);
-    const username = randomUsername();
-    const password = randomPassword();
-    await sdk.register({ username, password });
-  });
-
-  afterAll(() => {
-    sdk.disconnect();
+    await sdk.register({
+      username: randomUsername(),
+      password: randomPassword(),
+    });
   });
 
   it('应该成功连接到 WebSocket 网关', async () => {
@@ -32,7 +33,6 @@ describe('WebSocket 连接集成测试', () => {
       stateChanges.push(event.data.state);
     });
 
-    // 先断开再连接
     sdk.disconnect();
     await sleep(500);
 
