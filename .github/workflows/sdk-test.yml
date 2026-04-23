@@ -20,9 +20,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          
+
       - name: cache image
-        use: sanbei101/image-sync-action@v1
+        uses: sanbei101/image-sync-action@v1
         with:
           images: |
             postgres:18
