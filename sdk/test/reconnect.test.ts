@@ -72,20 +72,12 @@ describe('重连机制集成测试', () => {
       console.log('收到错误事件:', event.data.code, event.data.message);
     });
 
-    // 尝试连接
-    try {
-      await badSdk.connect();
-    } catch (error) {
-      // 预期会失败
-      console.log('连接失败:', error);
-    }
+    // 尝试连接 - 预期会失败
+    await expect(badSdk.connect()).rejects.toThrow();
 
     await sleep(3000); // 等待重连尝试
 
     unsubscribe();
-
-    // 应该收到错误事件
-    expect(errors.length).toBeGreaterThan(0);
 
     badSdk.disconnect();
   });

@@ -80,28 +80,14 @@ describe('用户认证 API 集成测试', () => {
     await sdk.register({ username, password });
     sdk.clearAuth();
 
-    // 使用错误密码登录应该失败
-    try {
-      await sdk.login({ username, password: 'wrong_password' });
-      // 如果到这里说明测试失败
-      expect.fail('应该抛出错误');
-    } catch (error: any) {
-      expect(error).toBeDefined();
-      console.log('密码错误验证通过:', error.message);
-    }
+    await expect(sdk.login({ username, password: 'wrong_password' })).rejects.toThrow();
   });
 
   it('登录时应该验证用户不存在', async () => {
-    try {
-      await sdk.login({
-        username: `nonexistent_${randomUsername()}`,
-        password: randomPassword(),
-      });
-      expect.fail('应该抛出错误');
-    } catch (error: any) {
-      expect(error).toBeDefined();
-      console.log('用户不存在验证通过:', error.message);
-    }
+    await expect(sdk.login({
+      username: `nonexistent_${randomUsername()}`,
+      password: randomPassword(),
+    })).rejects.toThrow();
   });
 
   it('应该批量生成测试用户', async () => {
@@ -122,20 +108,9 @@ describe('用户认证 API 集成测试', () => {
 
   it('批量生成应该限制数量范围', async () => {
     // 测试数量过大
-    try {
-      await sdk.batchGenerateUsers({ count: 101 });
-      expect.fail('应该抛出错误');
-    } catch (error: any) {
-      expect(error).toBeDefined();
-      console.log('数量限制验证通过:', error.message);
-    }
+    await expect(sdk.batchGenerateUsers({ count: 101 })).rejects.toThrow();
 
     // 测试数量为0
-    try {
-      await sdk.batchGenerateUsers({ count: 0 });
-      expect.fail('应该抛出错误');
-    } catch (error: any) {
-      expect(error).toBeDefined();
-    }
+    await expect(sdk.batchGenerateUsers({ count: 0 })).rejects.toThrow();
   });
 });

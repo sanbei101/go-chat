@@ -83,13 +83,7 @@ describe('WebSocket 连接集成测试', () => {
   it('未认证时不应该能连接', async () => {
     const unauthSdk = new ChatSDK(TEST_CONFIG);
 
-    try {
-      await unauthSdk.connect();
-      expect.fail('应该抛出错误');
-    } catch (error: any) {
-      expect(error.message).toContain('authenticated');
-      console.log('未认证连接被正确拒绝:', error.message);
-    }
+    await expect(unauthSdk.connect()).rejects.toThrow(/authenticated/i);
   });
 
   it('应该支持多次连接断开', async () => {
