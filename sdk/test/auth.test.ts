@@ -27,8 +27,6 @@ describe('用户认证 API 集成测试', () => {
     expect(result.username).toBe(username);
     expect(result.token).toBeDefined();
     expect(result.token.length).toBeGreaterThan(0);
-
-    console.log('注册成功:', { user_id: result.user_id, username: result.username });
   });
 
   it('应该成功登录已注册用户', async () => {
@@ -52,8 +50,6 @@ describe('用户认证 API 集成测试', () => {
     expect(loginResult.user_id).toBe(registerResult.user_id);
     expect(loginResult.username).toBe(username);
     expect(loginResult.token).toBeDefined();
-
-    console.log('登录成功:', { user_id: loginResult.user_id, username: loginResult.username });
   });
 
   it('应该使用相同的 token 登录', async () => {
@@ -97,12 +93,11 @@ describe('用户认证 API 集成测试', () => {
     expect(result).toBeDefined();
     expect(result.length).toBe(count);
 
-    result.forEach((user, index) => {
+    result.forEach((user) => {
       expect(user.user_id).toBeDefined();
       expect(user.username).toBeDefined();
       expect(user.password).toBeDefined();
       expect(user.token).toBeDefined();
-      console.log(`批量生成用户 ${index + 1}:`, { user_id: user.user_id, username: user.username });
     });
   });
 

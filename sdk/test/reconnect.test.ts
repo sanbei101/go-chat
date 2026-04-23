@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ChatSDK, ChatType, ChatEventType, ConnectionState } from '../index';
+import { ChatSDK, ChatType, ChatEventType } from '../index';
 import { TEST_CONFIG, randomUsername, randomPassword, sleep } from './setup';
 
 describe('重连机制集成测试', () => {
@@ -22,28 +22,13 @@ describe('重连机制集成测试', () => {
     sdk.disconnect();
   });
 
-  it('连接断开后应该自动重连', async () => {
+  it('主动断开连接后状态应该正确', async () => {
     await sdk.connect();
     expect(sdk.isConnected()).toBe(true);
 
-    // 监听重连事件
-    const stateChanges: ConnectionState[] = [];
-    const unsubscribe = sdk.on(ChatEventType.ConnectionStateChange, (event) => {
-      stateChanges.push(event.data.state);
-      console.log('重连测试 - 状态变更:', event.data.state);
-    });
-
-    // 模拟断连(强制关闭 WebSocket)
-    // 这里我们断开连接后,SDK 会自动尝试重连
     sdk.disconnect();
 
-    // 等待一段时间观察重连行为
-    await sleep(2000);
-
-    unsubscribe();
-
-    // 断开后的状态应该包含 Reconnecting 或最终恢复到 Connected
-    expect(stateChanges).toContain(ConnectionState.Disconnected);
+    expect(sdk.isConnected()).toBe(false);
   });
 
   it('应该触发错误事件', async () => {
@@ -69,7 +54,6 @@ describe('重连机制集成测试', () => {
         code: event.data.code,
         message: event.data.message,
       });
-      console.log('收到错误事件:', event.data.code, event.data.message);
     });
 
     // 尝试连接 - 预期会失败

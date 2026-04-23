@@ -22,12 +22,8 @@ describe('消息发送与接收集成测试', () => {
     user1Id = result1.user_id;
     user2Id = result2.user_id;
 
-    console.log('用户1:', user1Id);
-    console.log('用户2:', user2Id);
-
     // 连接 WebSocket
     await Promise.all([sdk1.connect(), sdk2.connect()]);
-    await sleep(500); // 等待连接稳定
 
     expect(sdk1.isConnected()).toBe(true);
     expect(sdk2.isConnected()).toBe(true);
@@ -48,7 +44,6 @@ describe('消息发送与接收集成测试', () => {
         text: (msg.payload as { text: string }).text,
         sender_id: msg.sender_id,
       });
-      console.log('sdk2 收到消息:', msg.payload);
     });
 
     // sdk1 发送消息
@@ -59,12 +54,8 @@ describe('消息发送与接收集成测试', () => {
       text: testText,
     });
 
-    // 等待消息到达(最多5秒)
-    let waited = 0;
-    while (receivedMessages.length === 0 && waited < 5000) {
-      await sleep(100);
-      waited += 100;
-    }
+    // 等待消息到达
+    await sleep(2000);
 
     unsubscribe();
 
@@ -83,7 +74,6 @@ describe('消息发送与接收集成测试', () => {
         text: (msg.payload as { text: string }).text,
         sender_id: msg.sender_id,
       });
-      console.log('sdk1 收到消息:', msg.payload);
     });
 
     // sdk2 发送消息
@@ -94,11 +84,7 @@ describe('消息发送与接收集成测试', () => {
       text: replyText,
     });
 
-    let waited = 0;
-    while (receivedMessages.length === 0 && waited < 5000) {
-      await sleep(100);
-      waited += 100;
-    }
+    await sleep(2000);
 
     unsubscribe();
 
@@ -116,8 +102,6 @@ describe('消息发送与接收集成测试', () => {
         payload: event.data.message.payload,
       });
     });
-
-    await sleep(100);
 
     // 发送图片消息
     sdk1.sendImageMessage({
@@ -152,11 +136,7 @@ describe('消息发送与接收集成测试', () => {
     });
 
     // 等待消息到达
-    let waited = 0;
-    while (receivedMessages.length < 3 && waited < 5000) {
-      await sleep(100);
-      waited += 100;
-    }
+    await sleep(3000);
 
     unsubscribe();
 
@@ -195,11 +175,7 @@ describe('消息发送与接收集成测试', () => {
       payload: { text: 'Test client_msg_id' },
     });
 
-    let waited = 0;
-    while (receivedMessages.length === 0 && waited < 5000) {
-      await sleep(100);
-      waited += 100;
-    }
+    await sleep(2000);
 
     unsubscribe();
 

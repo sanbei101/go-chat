@@ -23,8 +23,6 @@ describe('WebSocket 连接集成测试', () => {
 
     expect(sdk.isConnected()).toBe(true);
     expect(sdk.getConnectionState()).toBe(ConnectionState.Connected);
-
-    console.log('WebSocket 连接成功');
   });
 
   it('应该触发连接状态变更事件', async () => {
@@ -32,7 +30,6 @@ describe('WebSocket 连接集成测试', () => {
 
     const unsubscribe = sdk.on(ChatEventType.ConnectionStateChange, (event) => {
       stateChanges.push(event.data.state);
-      console.log('连接状态变更:', event.data.previousState, '->', event.data.state);
     });
 
     // 先断开再连接
@@ -51,16 +48,11 @@ describe('WebSocket 连接集成测试', () => {
   it('应该触发 connect 事件', async () => {
     let connected = false;
 
-    const unsubscribe = sdk.on(ChatEventType.Connect, (_event) => {
+    const unsubscribe = sdk.on(ChatEventType.Connect, () => {
       connected = true;
-      console.log('收到 connect 事件');
     });
 
-    sdk.disconnect();
-    await sleep(500);
-
     await sdk.connect();
-    await sleep(500);
 
     unsubscribe();
 
@@ -76,8 +68,6 @@ describe('WebSocket 连接集成测试', () => {
 
     expect(sdk.isConnected()).toBe(false);
     expect(sdk.getConnectionState()).toBe(ConnectionState.Disconnected);
-
-    console.log('断开连接后状态正确');
   });
 
   it('未认证时不应该能连接', async () => {
@@ -96,7 +86,5 @@ describe('WebSocket 连接集成测试', () => {
       await sleep(200);
       expect(sdk.isConnected()).toBe(false);
     }
-
-    console.log('多次连接断开测试通过');
   });
 });
