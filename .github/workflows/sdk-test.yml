@@ -22,7 +22,7 @@ jobs:
           node-version: '24'
 
       - name: cache image
-        uses: sanbei101/image-sync-action@v1
+        uses: sanbei101/image-cache-action@v1
         with:
           images: |
             postgres:18
