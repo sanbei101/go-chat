@@ -2,13 +2,14 @@
 // protoc-gen-go-vtproto version: v0.6.0
 // source: internal/model/proto/message.proto
 
-package model
+package pb
 
 import (
 	fmt "fmt"
 	protohelpers "github.com/planetscale/vtprotobuf/protohelpers"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	io "io"
+	sync "sync"
 )
 
 const (
@@ -110,6 +111,40 @@ func (m *Message) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+var vtprotoPool_Message = sync.Pool{
+	New: func() interface{} {
+		return &Message{}
+	},
+}
+
+func (m *Message) ResetVT() {
+	if m != nil {
+		f0 := m.MsgId[:0]
+		f1 := m.ClientMsgId[:0]
+		f2 := m.SenderId[:0]
+		f3 := m.RoomId[:0]
+		f4 := m.ReplyToMsgId[:0]
+		f5 := m.Payload[:0]
+		f6 := m.Ext[:0]
+		m.Reset()
+		m.MsgId = f0
+		m.ClientMsgId = f1
+		m.SenderId = f2
+		m.RoomId = f3
+		m.ReplyToMsgId = f4
+		m.Payload = f5
+		m.Ext = f6
+	}
+}
+func (m *Message) ReturnToVTPool() {
+	if m != nil {
+		m.ResetVT()
+		vtprotoPool_Message.Put(m)
+	}
+}
+func MessageFromVTPool() *Message {
+	return vtprotoPool_Message.Get().(*Message)
+}
 func (m *Message) SizeVT() (n int) {
 	if m == nil {
 		return 0

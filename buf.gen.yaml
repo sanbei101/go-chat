@@ -5,4 +5,7 @@ plugins:
     opt: paths=source_relative
   - plugin: go-vtproto
     out: ./
-    opt: paths=source_relative,features=marshal+unmarshal+size+pool,pool=./model.ProtoChatMessage
+    opt:
+      - paths=source_relative
+      - features=marshal+unmarshal+size+pool
+      - pool=./pb.Message

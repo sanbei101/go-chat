@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package proto;
+package im.proto.v1;
 
-option go_package = "./model";
+option go_package = "./pb";
 
 enum MessageType {
   MESSAGE_TYPE_UNSPECIFIED = 0;

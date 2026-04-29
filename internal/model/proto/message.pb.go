@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: internal/model/proto/message.proto
 
-package model
+package pb
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -86,7 +86,7 @@ type Message struct {
 	SenderId      []byte                 `protobuf:"bytes,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	RoomId        []byte                 `protobuf:"bytes,4,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	ReplyToMsgId  []byte                 `protobuf:"bytes,5,opt,name=reply_to_msg_id,json=replyToMsgId,proto3,oneof" json:"reply_to_msg_id,omitempty"`
-	MsgType       MessageType            `protobuf:"varint,6,opt,name=msg_type,json=msgType,proto3,enum=proto.MessageType" json:"msg_type,omitempty"`
+	MsgType       MessageType            `protobuf:"varint,6,opt,name=msg_type,json=msgType,proto3,enum=im.proto.v1.MessageType" json:"msg_type,omitempty"`
 	ServerTime    int64                  `protobuf:"varint,7,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,8,opt,name=payload,proto3" json:"payload,omitempty"`
 	Ext           []byte                 `protobuf:"bytes,9,opt,name=ext,proto3,oneof" json:"ext,omitempty"`
@@ -191,14 +191,14 @@ var File_internal_model_proto_message_proto protoreflect.FileDescriptor
 
 const file_internal_model_proto_message_proto_rawDesc = "" +
 	"\n" +
-	"\"internal/model/proto/message.proto\x12\x05proto\"\xc3\x02\n" +
+	"\"internal/model/proto/message.proto\x12\vim.proto.v1\"\xc9\x02\n" +
 	"\aMessage\x12\x15\n" +
 	"\x06msg_id\x18\x01 \x01(\fR\x05msgId\x12\"\n" +
 	"\rclient_msg_id\x18\x02 \x01(\fR\vclientMsgId\x12\x1b\n" +
 	"\tsender_id\x18\x03 \x01(\fR\bsenderId\x12\x17\n" +
 	"\aroom_id\x18\x04 \x01(\fR\x06roomId\x12*\n" +
-	"\x0freply_to_msg_id\x18\x05 \x01(\fH\x00R\freplyToMsgId\x88\x01\x01\x12-\n" +
-	"\bmsg_type\x18\x06 \x01(\x0e2\x12.proto.MessageTypeR\amsgType\x12\x1f\n" +
+	"\x0freply_to_msg_id\x18\x05 \x01(\fH\x00R\freplyToMsgId\x88\x01\x01\x123\n" +
+	"\bmsg_type\x18\x06 \x01(\x0e2\x18.im.proto.v1.MessageTypeR\amsgType\x12\x1f\n" +
 	"\vserver_time\x18\a \x01(\x03R\n" +
 	"serverTime\x12\x18\n" +
 	"\apayload\x18\b \x01(\fR\apayload\x12\x15\n" +
@@ -211,7 +211,7 @@ const file_internal_model_proto_message_proto_rawDesc = "" +
 	"\x12MESSAGE_TYPE_IMAGE\x10\x02\x12\x16\n" +
 	"\x12MESSAGE_TYPE_VIDEO\x10\x03\x12\x15\n" +
 	"\x11MESSAGE_TYPE_FILE\x10\x04\x12\x17\n" +
-	"\x13MESSAGE_TYPE_SYSTEM\x10\x05B\tZ\a./modelb\x06proto3"
+	"\x13MESSAGE_TYPE_SYSTEM\x10\x05B\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_internal_model_proto_message_proto_rawDescOnce sync.Once
@@ -228,11 +228,11 @@ func file_internal_model_proto_message_proto_rawDescGZIP() []byte {
 var file_internal_model_proto_message_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_internal_model_proto_message_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_internal_model_proto_message_proto_goTypes = []any{
-	(MessageType)(0), // 0: proto.MessageType
-	(*Message)(nil),  // 1: proto.Message
+	(MessageType)(0), // 0: im.proto.v1.MessageType
+	(*Message)(nil),  // 1: im.proto.v1.Message
 }
 var file_internal_model_proto_message_proto_depIdxs = []int32{
-	0, // 0: proto.Message.msg_type:type_name -> proto.MessageType
+	0, // 0: im.proto.v1.Message.msg_type:type_name -> im.proto.v1.MessageType
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
