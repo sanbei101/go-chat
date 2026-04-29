@@ -35,13 +35,13 @@ describe('SDK 完整流程集成测试', () => {
 
     // 双向发送消息
     sdkA.sendTextMessage({
-      receiver_id: userB.user_id,
+      room_id: userB.user_id,
       chat_type: ChatType.Single,
       text: 'Hello from User A!',
     });
 
     sdkB.sendTextMessage({
-      receiver_id: userA.user_id,
+      room_id: userA.user_id,
       chat_type: ChatType.Single,
       text: 'Hello from User B!',
     });

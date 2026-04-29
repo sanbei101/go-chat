@@ -49,7 +49,7 @@ export default function (users) {
         
         const message = {
           client_msg_id: uuidv4(), 
-          receiver_id: partner.user_id,
+          room_id: partner.user_id,
           chat_type: "single",
           msg_type: "text",
           payload: {

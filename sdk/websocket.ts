@@ -157,7 +157,7 @@ export class WebSocketManager {
   private buildMessage(req: SendMessageRequest): Record<string, unknown> {
     return {
       client_msg_id: req.client_msg_id,
-      receiver_id: req.receiver_id,
+      room_id: req.room_id,
       chat_type: req.chat_type,
       msg_type: req.msg_type,
       payload: req.payload,

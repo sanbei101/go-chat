@@ -89,7 +89,7 @@ describe('错误处理集成测试', () => {
 
     // 不连接就发送消息(消息会被加入队列,同时触发错误)
     sdk.sendTextMessage({
-      receiver_id: 'test-user-id',
+      room_id: 'test-user-id',
       chat_type: ChatType.Single,
       text: 'Test',
     });

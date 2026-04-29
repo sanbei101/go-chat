@@ -49,7 +49,7 @@ describe('消息发送与接收集成测试', () => {
     // sdk1 发送消息
     const testText = `Hello from user1! ${Date.now()}`;
     sdk1.sendTextMessage({
-      receiver_id: user2Id,
+      room_id: user2Id,
       chat_type: ChatType.Single,
       text: testText,
     });
@@ -79,7 +79,7 @@ describe('消息发送与接收集成测试', () => {
     // sdk2 发送消息
     const replyText = `Reply from user2! ${Date.now()}`;
     sdk2.sendTextMessage({
-      receiver_id: user1Id,
+      room_id: user1Id,
       chat_type: ChatType.Single,
       text: replyText,
     });
@@ -105,7 +105,7 @@ describe('消息发送与接收集成测试', () => {
 
     // 发送图片消息
     sdk1.sendImageMessage({
-      receiver_id: user2Id,
+      room_id: user2Id,
       chat_type: ChatType.Single,
       url: 'https://example.com/image.jpg',
       width: 1920,
@@ -115,7 +115,7 @@ describe('消息发送与接收集成测试', () => {
 
     // 发送视频消息
     sdk1.sendVideoMessage({
-      receiver_id: user2Id,
+      room_id: user2Id,
       chat_type: ChatType.Single,
       url: 'https://example.com/video.mp4',
       duration: 60,
@@ -127,7 +127,7 @@ describe('消息发送与接收集成测试', () => {
 
     // 发送文件消息
     sdk1.sendFileMessage({
-      receiver_id: user2Id,
+      room_id: user2Id,
       chat_type: ChatType.Single,
       url: 'https://example.com/document.pdf',
       name: 'document.pdf',
@@ -169,7 +169,7 @@ describe('消息发送与接收集成测试', () => {
 
     sdk1.sendMessage({
       client_msg_id: clientMsgId,
-      receiver_id: user2Id,
+      room_id: user2Id,
       chat_type: ChatType.Single,
       msg_type: MessageType.Text,
       payload: { text: 'Test client_msg_id' },
@@ -195,7 +195,7 @@ describe('消息发送与接收集成测试', () => {
     // 不应该抛出错误(消息会被缓存)
     expect(() => {
       disconnectedSdk.sendTextMessage({
-        receiver_id: user2Id,
+        room_id: user2Id,
         chat_type: ChatType.Single,
         text: 'This message should be queued',
       });

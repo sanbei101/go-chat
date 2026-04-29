@@ -45,7 +45,7 @@
     "msg_id": "后端生成的uuidv7",
     "client_msg_id": "前端生成的uuidv7" // 保证幂等性,
     "sender_id": "user_1001",
-    "receiver_id": "user_1002",
+    "room_id": "user_1002",
     "chat_type": "CHAT_TYPE_SINGLE",
     "server_time": 1743020000000000000,
     "text": {

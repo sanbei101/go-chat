@@ -21,7 +21,7 @@ export interface Message {
   /** 发送者ID */
   sender_id: string;
   /** 接收者ID(用户ID或群ID) */
-  receiver_id: string;
+  room_id: string;
   /** 聊天类型: single(单聊) / group(群聊) */
   chat_type: ChatType;
   /** 服务器时间戳(微秒级) */
@@ -43,7 +43,7 @@ export interface SendMessageRequest {
   /** 客户端生成的唯一消息ID */
   client_msg_id?: string;
   /** 接收者ID */
-  receiver_id: string;
+  room_id: string;
   /** 聊天类型 */
   chat_type: ChatType;
   /** 消息类型 */
@@ -215,7 +215,7 @@ export type EventListener<T extends ChatEventType = ChatEventType> = (
 // 历史消息查询参数
 export interface HistoryQueryParams {
   /** 接收者ID */
-  receiver_id: string;
+  room_id: string;
   /** 聊天类型 */
   chat_type: ChatType;
   /** 查询此时间戳之前的消息(微秒级,默认为当前时间) */

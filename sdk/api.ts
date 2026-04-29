@@ -129,7 +129,7 @@ export class APIClient {
   async getHistoryMessages(params: HistoryQueryParams): Promise<HistoryMessagesResponse> {
     // 构建查询参数
     const queryParams = new URLSearchParams();
-    queryParams.append('receiver_id', params.receiver_id);
+    queryParams.append('room_id', params.room_id);
     queryParams.append('chat_type', params.chat_type);
 
     if (params.before_server_time !== undefined) {
