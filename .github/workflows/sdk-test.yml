@@ -1,4 +1,4 @@
-name: sdk测试
+name: SDK测试
 on:
   workflow_dispatch:
   push:
