@@ -7,9 +7,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o worker ./cmd/worker/
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o gateway ./cmd/gateway/
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o api ./cmd/api/
+RUN GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o worker ./cmd/worker/
+RUN GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o gateway ./cmd/gateway/
+RUN GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o api ./cmd/api/
 
 FROM alpine:latest
 
