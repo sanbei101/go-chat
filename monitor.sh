@@ -13,7 +13,7 @@ printf "%-10s | %-15s | %-15s | %-15s | %-15s\n" "时间" "Redis 总量" "Redis 
 printf "%-10s | %-15s | %-15s | %-15s | %-15s\n" "----------" "---------------" "---------------" "---------------" "---------------"
 
 while true; do
-    current_redis=$($REDIS_CMD XLEN messages:inbound 2>/dev/null | tr -d '\r')
+    current_redis=$($REDIS_CMD XLEN message:inbound 2>/dev/null | tr -d '\r')
     current_pg=$(psql "$PG_URI" -t -c "select count(*) from messages;" 2>/dev/null | xargs)
 
     current_redis=${current_redis:-0}
