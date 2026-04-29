@@ -3,7 +3,7 @@ INSERT INTO messages (
     msg_id,
     client_msg_id,
     sender_id,
-    receiver_id,
+    room_id,
     chat_type,
     msg_type,
     server_time,
@@ -14,7 +14,7 @@ INSERT INTO messages (
     sqlc.arg(msg_id),
     sqlc.arg(client_msg_id),
     sqlc.arg(sender_id),
-    sqlc.arg(receiver_id),
+    sqlc.arg(room_id),
     sqlc.arg(chat_type),
     sqlc.arg(msg_type),
     sqlc.arg(server_time),
@@ -28,7 +28,7 @@ INSERT INTO messages (
     msg_id,
     client_msg_id,
     sender_id,
-    receiver_id,
+    room_id,
     chat_type,
     msg_type,
     server_time,
@@ -39,7 +39,7 @@ INSERT INTO messages (
     sqlc.arg(msg_id),
     sqlc.arg(client_msg_id),
     sqlc.arg(sender_id),
-    sqlc.arg(receiver_id),
+    sqlc.arg(room_id),
     sqlc.arg(chat_type),
     sqlc.arg(msg_type),
     sqlc.arg(server_time),
@@ -55,7 +55,7 @@ INSERT INTO messages (
     msg_id,
     client_msg_id,
     sender_id,
-    receiver_id,
+    room_id,
     chat_type,
     msg_type,
     server_time,
@@ -66,7 +66,7 @@ INSERT INTO messages (
     sqlc.arg(msg_id),
     sqlc.arg(client_msg_id),
     sqlc.arg(sender_id),
-    sqlc.arg(receiver_id),
+    sqlc.arg(room_id),
     sqlc.arg(chat_type),
     sqlc.arg(msg_type),
     sqlc.arg(server_time),
@@ -80,7 +80,7 @@ SELECT
     msg_id,
     client_msg_id,
     sender_id,
-    receiver_id,
+    room_id,
     chat_type,
     msg_type,
     server_time,
@@ -92,12 +92,12 @@ FROM messages
 WHERE msg_id = sqlc.arg(msg_id)
 LIMIT 1;
 
--- name: ListMessagesByConversation :many
+-- name: ListMessagesByRoom :many
 SELECT
     msg_id,
     client_msg_id,
     sender_id,
-    receiver_id,
+    room_id,
     chat_type,
     msg_type,
     server_time,
@@ -106,8 +106,7 @@ SELECT
     ext,
     created_at
 FROM messages
-WHERE receiver_id = sqlc.arg(receiver_id)
-  AND chat_type = sqlc.arg(chat_type)
+WHERE room_id = sqlc.arg(room_id)
   AND server_time < sqlc.arg(before_server_time)
 ORDER BY server_time DESC
 LIMIT sqlc.arg(page_size);

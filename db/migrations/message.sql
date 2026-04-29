@@ -8,14 +8,41 @@ CREATE TYPE message_type AS ENUM (
     'text',
     'image',
     'video',
-    'file'
+    'file',
+    'system'
+);
+
+CREATE TYPE member_role AS ENUM (
+    'owner',
+    'admin',
+    'member'
+);
+
+CREATE TABLE rooms (
+    room_id uuid PRIMARY KEY,
+    chat_type chat_type NOT NULL,
+    name VARCHAR(255),
+    avatar_url VARCHAR(1024),
+    single_chat_hash VARCHAR(64) UNIQUE, 
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE room_members (
+    room_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role member_role NOT NULL DEFAULT 'member',
+    is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
+    is_muted BOOLEAN NOT NULL DEFAULT FALSE,
+    
+    PRIMARY KEY (room_id, user_id)
 );
 
 CREATE TABLE messages (
     msg_id uuid PRIMARY KEY,
     client_msg_id uuid NOT NULL,
     sender_id uuid NOT NULL,
-    receiver_id uuid NOT NULL,
+    room_id uuid NOT NULL,
     chat_type chat_type NOT NULL,
     server_time BIGINT NOT NULL,
     reply_to_msg_id uuid DEFAULT NULL,
@@ -24,8 +51,10 @@ CREATE TABLE messages (
     ext JSONB DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- 用于查询"某个 Room 的所有成员"
+CREATE INDEX idx_room_members_user_id ON room_members (user_id);
+-- 客户端进入某个 Room 时,按时间倒序拉取历史消息
+CREATE INDEX idx_messages_room_time ON messages (room_id, server_time DESC);
 
+-- 用于查询"某个人发过的所有消息"
 CREATE INDEX idx_messages_sender_id ON messages (sender_id);
-CREATE INDEX idx_messages_receiver_id ON messages (receiver_id);
-CREATE INDEX idx_messages_server_time ON messages (server_time DESC);
-CREATE INDEX idx_messages_chat_receiver_time ON messages (chat_type, receiver_id, server_time DESC);
