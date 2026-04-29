@@ -153,8 +153,8 @@ func (g *Gateway) HandleWorkerMessages(ctx context.Context) {
 					log.Error().Err(marshalErr).Msg("gateway marshal message failed")
 					continue
 				}
-				receiverID := msg.Data.ReceiverID.String()
-				g.deliverToClient(receiverID, bin)
+				roomID := msg.Data.RoomID.String()
+				g.deliverToClient(roomID, bin)
 			}
 			err = g.redis.GatewayAckMessage(ctx, msgIDs...)
 			if err != nil {

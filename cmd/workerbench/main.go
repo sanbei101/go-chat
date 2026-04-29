@@ -58,7 +58,7 @@ func main() {
 			MsgID:       msgID,
 			ClientMsgID: clientID,
 			SenderID:    senderID,
-			ReceiverID:  receiverID,
+			RoomID:      receiverID,
 			ChatType:    db.ChatTypeSingle,
 			MsgType:     db.MessageTypeText,
 			ServerTime:  time.Now().UnixNano(),

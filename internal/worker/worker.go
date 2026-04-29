@@ -78,7 +78,7 @@ func (s *Service) ProcessInbound(ctx context.Context, batchSize int64) error {
 			MsgID:        chatMsg.MsgID,
 			ClientMsgID:  chatMsg.ClientMsgID,
 			SenderID:     chatMsg.SenderID,
-			ReceiverID:   chatMsg.ReceiverID,
+			RoomID:       chatMsg.RoomID,
 			ChatType:     chatMsg.ChatType,
 			MsgType:      chatMsg.MsgType,
 			ServerTime:   chatMsg.ServerTime,
